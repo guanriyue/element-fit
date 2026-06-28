@@ -1,0 +1,38 @@
+{
+  "name": "element-fit",
+  "version": "0.0.0",
+  "description": "",
+  "private": true,
+  "scripts": {},
+  "keywords": [],
+  "author": {
+    "name": "guanriyue",
+    "url": "https://github.com/guanriyue"
+  },
+  "homepage": "https://guanriyue.github.io/element-fit/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/guanriyue/element-fit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/guanriyue/element-fit/issues"
+  },
+  "engines": {
+    "node": ">=22.11.0"
+  },
+  "license": "MIT",
+  "packageManager": "pnpm@11.9.0",
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.16",
+    "@changesets/cli": "^2.31.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^25.9.2",
+    "@vitejs/plugin-react": "^6.0.2",
+    "jsdom": "^29.1.1",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vitest": "^4.1.8"
+  }
+}
