@@ -42,6 +42,8 @@ importers:
         specifier: ^4.1.8
         version: 4.1.9(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4))
 
+  packages/resize-observer-hub: {}
+
 packages:
 
   '@adobe/css-tools@4.5.0':
