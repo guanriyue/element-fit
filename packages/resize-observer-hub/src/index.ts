@@ -1,1 +1,1 @@
-export {}
+export { observeElementResize } from './vanilla';
