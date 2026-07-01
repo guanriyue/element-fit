@@ -1,1 +1,1 @@
-export { useElementFit } from './useElementFit';
+export { useElementResize } from './useElementResize';

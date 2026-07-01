@@ -2,11 +2,11 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useSyncExternalStore 
 import { normalizeOptions } from '../vanilla/hub.ts';
 import { observeElementResize } from '../vanilla/index.ts';
 
-export type UseElementFitOptions<T> = ResizeObserverOptions & {
+export type UseElementResizeOptions<T> = ResizeObserverOptions & {
   eq?: (prev: T, next: T) => boolean;
 };
 
-type ElementFitStore<T> = {
+type ElementResizeStore<T> = {
   getSnapshot: () => T | undefined;
   subscribe: (listener: () => void) => () => void;
   setSelector: (selector: (entry: ResizeObserverEntry) => T) => void;
@@ -17,11 +17,11 @@ type ElementFitStore<T> = {
   dispose: () => void;
 };
 
-const createElementFitStore = <T>(
+const createElementResizeStore = <T>(
   initialSelector: (entry: ResizeObserverEntry) => T,
   initialEqual: (prev: T, next: T) => boolean,
   initialBox: ResizeObserverBoxOptions,
-): ElementFitStore<T> => {
+): ElementResizeStore<T> => {
   const listeners = new Set<() => void>();
   let selector = initialSelector;
   let equal = initialEqual;
@@ -139,7 +139,7 @@ const getServerSnapshot = () => undefined;
  *
  * @example
  * ```tsx
- * const { ref, data } = useElementFit(
+ * const { ref, data } = useElementResize(
  *   (entry) => Math.floor(entry.contentRect.width),
  *   {
  *     box: 'border-box',
@@ -150,9 +150,9 @@ const getServerSnapshot = () => undefined;
  * return <div ref={ref}>{data}</div>;
  * ```
  */
-export const useElementFit = <T>(
+export const useElementResize = <T>(
   selector: (entry: ResizeObserverEntry) => T,
-  options?: UseElementFitOptions<T>,
+  options?: UseElementResizeOptions<T>,
 ): {
   ref: React.RefCallback<Element>;
   data: T | undefined;
@@ -163,7 +163,7 @@ export const useElementFit = <T>(
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: 仅对初始化有影响
   const store = useMemo(() => {
-    return createElementFitStore(selector, eq, box);
+    return createElementResizeStore(selector, eq, box);
   }, []);
 
   store.setSelector(selector);

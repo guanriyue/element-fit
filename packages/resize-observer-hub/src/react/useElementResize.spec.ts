@@ -38,7 +38,7 @@ const entry = (target: Element, width: number): MockEntry => {
 };
 
 const importHook = async () => {
-  return await import('./useElementFit.ts');
+  return await import('./useElementResize.ts');
 };
 
 const strictModeWrapper = ({ children }: PropsWithChildren) => {
@@ -56,11 +56,11 @@ afterEach(() => {
   globalThis.ResizeObserver = originalResizeObserver;
 });
 
-describe('useElementFit', () => {
+describe('useElementResize', () => {
   it('returns undefined data before ref is bound', async () => {
-    const { useElementFit } = await importHook();
+    const { useElementResize } = await importHook();
     const selector = vi.fn((resizeEntry: ResizeObserverEntry) => resizeEntry.contentRect.width);
-    const { result } = renderHook(() => useElementFit(selector));
+    const { result } = renderHook(() => useElementResize(selector));
 
     expect(result.current.data).toBeUndefined();
     expect(selector).not.toHaveBeenCalled();
@@ -68,10 +68,10 @@ describe('useElementFit', () => {
   });
 
   it('returns data selected from ResizeObserverEntry', async () => {
-    const { useElementFit } = await importHook();
+    const { useElementResize } = await importHook();
     const target = element();
     const { result } = renderHook(() =>
-      useElementFit((resizeEntry) => resizeEntry.contentRect.width),
+      useElementResize((resizeEntry) => resizeEntry.contentRect.width),
     );
 
     act(() => {
@@ -86,7 +86,7 @@ describe('useElementFit', () => {
   });
 
   it('does not recompute when selector changes until the next resize', async () => {
-    const { useElementFit } = await importHook();
+    const { useElementResize } = await importHook();
     const target = element();
     const firstSelector = vi.fn(
       (resizeEntry: ResizeObserverEntry) => resizeEntry.contentRect.width,
@@ -94,7 +94,7 @@ describe('useElementFit', () => {
     const secondSelector = vi.fn(
       (resizeEntry: ResizeObserverEntry) => resizeEntry.contentRect.width * 2,
     );
-    const { result, rerender } = renderHook(({ selector }) => useElementFit(selector), {
+    const { result, rerender } = renderHook(({ selector }) => useElementResize(selector), {
       initialProps: {
         selector: firstSelector,
       },
@@ -124,13 +124,13 @@ describe('useElementFit', () => {
   });
 
   it('does not run the next eq until the next resize', async () => {
-    const { useElementFit } = await importHook();
+    const { useElementResize } = await importHook();
     const target = element();
     const firstEqual = vi.fn((prev: number, next: number) => prev === next);
     const secondEqual = vi.fn(() => true);
     const { result, rerender } = renderHook(
       ({ eq }) =>
-        useElementFit((resizeEntry) => resizeEntry.contentRect.width, {
+        useElementResize((resizeEntry) => resizeEntry.contentRect.width, {
           eq,
         }),
       {
@@ -162,10 +162,10 @@ describe('useElementFit', () => {
   });
 
   it('uses Object.is by default to skip equal selected data updates', async () => {
-    const { useElementFit } = await importHook();
+    const { useElementResize } = await importHook();
     const target = element();
     const selector = vi.fn((resizeEntry: ResizeObserverEntry) => resizeEntry.contentRect.width);
-    const { result } = renderHook(() => useElementFit(selector));
+    const { result } = renderHook(() => useElementResize(selector));
 
     act(() => {
       result.current.ref(target);
@@ -186,10 +186,10 @@ describe('useElementFit', () => {
   });
 
   it('keeps the current snapshot when box changes and rebinds the current element', async () => {
-    const { useElementFit } = await importHook();
+    const { useElementResize } = await importHook();
     const target = element();
     const { result, rerender } = renderHook(
-      ({ box }) => useElementFit((resizeEntry) => resizeEntry.contentRect.width, { box }),
+      ({ box }) => useElementResize((resizeEntry) => resizeEntry.contentRect.width, { box }),
       {
         initialProps: {
           box: 'content-box' as ResizeObserverBoxOptions,
@@ -217,11 +217,11 @@ describe('useElementFit', () => {
   });
 
   it('keeps the current snapshot when target changes', async () => {
-    const { useElementFit } = await importHook();
+    const { useElementResize } = await importHook();
     const firstElement = element();
     const secondElement = element();
     const { result } = renderHook(() =>
-      useElementFit((resizeEntry) => resizeEntry.contentRect.width),
+      useElementResize((resizeEntry) => resizeEntry.contentRect.width),
     );
 
     act(() => {
@@ -244,10 +244,10 @@ describe('useElementFit', () => {
   });
 
   it('unobserves when callback ref receives null', async () => {
-    const { useElementFit } = await importHook();
+    const { useElementResize } = await importHook();
     const target = element();
     const { result } = renderHook(() =>
-      useElementFit((resizeEntry) => resizeEntry.contentRect.width),
+      useElementResize((resizeEntry) => resizeEntry.contentRect.width),
     );
 
     act(() => {
@@ -263,10 +263,10 @@ describe('useElementFit', () => {
   });
 
   it('rebinds box changes in StrictMode', async () => {
-    const { useElementFit } = await importHook();
+    const { useElementResize } = await importHook();
     const target = element();
     const { result, rerender } = renderHook(
-      ({ box }) => useElementFit((resizeEntry) => resizeEntry.contentRect.width, { box }),
+      ({ box }) => useElementResize((resizeEntry) => resizeEntry.contentRect.width, { box }),
       {
         initialProps: {
           box: 'content-box' as ResizeObserverBoxOptions,
@@ -290,10 +290,10 @@ describe('useElementFit', () => {
   });
 
   it('does not observe twice on initial ref binding', async () => {
-    const { useElementFit } = await importHook();
+    const { useElementResize } = await importHook();
     const target = element();
     const { result } = renderHook(() =>
-      useElementFit((resizeEntry) => resizeEntry.contentRect.width),
+      useElementResize((resizeEntry) => resizeEntry.contentRect.width),
     );
 
     act(() => {
@@ -305,10 +305,10 @@ describe('useElementFit', () => {
   });
 
   it('uses the initial box for the first ref binding without rebinding', async () => {
-    const { useElementFit } = await importHook();
+    const { useElementResize } = await importHook();
     const target = element();
     const { result } = renderHook(() =>
-      useElementFit((resizeEntry) => resizeEntry.contentRect.width, { box: 'border-box' }),
+      useElementResize((resizeEntry) => resizeEntry.contentRect.width, { box: 'border-box' }),
     );
 
     act(() => {
@@ -324,10 +324,10 @@ describe('useElementFit', () => {
   });
 
   it('does not reobserve when rerendering with the same box', async () => {
-    const { useElementFit } = await importHook();
+    const { useElementResize } = await importHook();
     const target = element();
     const { result, rerender } = renderHook(
-      ({ box }) => useElementFit((resizeEntry) => resizeEntry.contentRect.width, { box }),
+      ({ box }) => useElementResize((resizeEntry) => resizeEntry.contentRect.width, { box }),
       {
         initialProps: {
           box: 'content-box' as ResizeObserverBoxOptions,
@@ -346,10 +346,10 @@ describe('useElementFit', () => {
   });
 
   it('does not reobserve when the same ref target is passed again', async () => {
-    const { useElementFit } = await importHook();
+    const { useElementResize } = await importHook();
     const target = element();
     const { result } = renderHook(() =>
-      useElementFit((resizeEntry) => resizeEntry.contentRect.width),
+      useElementResize((resizeEntry) => resizeEntry.contentRect.width),
     );
 
     act(() => {
@@ -362,10 +362,10 @@ describe('useElementFit', () => {
   });
 
   it('unobserves the active target once on unmount', async () => {
-    const { useElementFit } = await importHook();
+    const { useElementResize } = await importHook();
     const target = element();
     const { result, unmount } = renderHook(() =>
-      useElementFit((resizeEntry) => resizeEntry.contentRect.width),
+      useElementResize((resizeEntry) => resizeEntry.contentRect.width),
     );
 
     act(() => {
