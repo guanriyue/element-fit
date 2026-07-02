@@ -24,6 +24,7 @@ export default defineConfig({
     lib: {
       entry: {
         index: resolve(root, 'src/index.ts'),
+        'FitGrid/index': resolve(root, 'src/FitGrid/index.ts'),
       },
       formats: ['es'],
       fileName: (_, entryName) => `${entryName}.js`,

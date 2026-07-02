@@ -18,6 +18,10 @@
     ".": {
       "types": "./src/index.ts",
       "import": "./src/index.ts"
+    },
+    "./fit-grid": {
+      "types": "./src/FitGrid/index.ts",
+      "import": "./src/FitGrid/index.ts"
     }
   },
   "scripts": {
@@ -49,6 +53,10 @@
       ".": {
         "types": "./dist/index.d.ts",
         "import": "./dist/index.js"
+      },
+      "./fit-grid": {
+        "types": "./dist/FitGrid/index.d.ts",
+        "import": "./dist/FitGrid/index.js"
       }
     }
   },
