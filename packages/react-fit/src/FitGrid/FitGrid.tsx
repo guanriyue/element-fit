@@ -4,6 +4,7 @@ import { forwardRef } from 'react';
 import { isPositiveInteger } from '../_internal/isPositiveInteger.ts';
 import { isUndefined } from '../_internal/isUndefined.ts';
 import { toCSSLength } from '../_internal/toCSSLength.ts';
+import type { PrimitiveDivProps } from '../_internal/types.ts';
 
 type FitGridStyle = React.CSSProperties & {
   display: 'grid';
@@ -12,20 +13,10 @@ type FitGridStyle = React.CSSProperties & {
   rowGap: string;
 };
 
-type FitGridItemComponent = React.ForwardRefExoticComponent<
-  FitGridItemProps & React.RefAttributes<HTMLDivElement>
->;
-
-type FitGridComponent = React.ForwardRefExoticComponent<
-  FitGridProps & React.RefAttributes<HTMLDivElement>
-> & {
-  Item: FitGridItemComponent;
-};
-
 /**
  * `FitGrid` 组件的属性。
  */
-export type FitGridProps = React.ComponentPropsWithoutRef<typeof Primitive.div> & {
+export interface FitGridProps extends PrimitiveDivProps {
   /**
    * 每个 item 在减少列数前应尽量保持的最小 inline size。
    */
@@ -61,7 +52,7 @@ export type FitGridProps = React.ComponentPropsWithoutRef<typeof Primitive.div> 
 /**
  * `FitGridItem` 组件的属性。
  */
-export type FitGridItemProps = React.ComponentPropsWithoutRef<typeof Primitive.div> & {
+export interface FitGridItemProps extends PrimitiveDivProps {
   /**
    * 当前 item 应跨越的列数。
    *
@@ -98,22 +89,7 @@ const getGridTemplateColumns = (
   return `repeat(auto-fit, minmax(${minItemWidth}, 1fr))`;
 };
 
-/**
- * 使用 CSS Grid 排列子项，并根据当前元素可用空间调整列数。
- *
- * 列数由每个 item 的最小宽度驱动，而不是由页面或容器断点直接决定。
- * 这使得它适用于过滤表单、工具面板、卡片列表，以及其他需要适配周围空间的重复控件。
- *
- * @example
- * ```tsx
- * <FitGrid minItemWidth="14rem" maxColumns={4} colGap="0.75rem">
- *   <input />
- *   <input />
- *   <button>Apply</button>
- * </FitGrid>
- * ```
- */
-const FitGrid = forwardRef<HTMLDivElement, FitGridProps>((props, ref) => {
+const FitGridRoot = forwardRef<HTMLDivElement, FitGridProps>((props, ref) => {
   const { minItemWidth, minColumns, maxColumns, colGap, rowGap, className, style, ...restProps } =
     props;
 
@@ -173,9 +149,9 @@ const FitGrid = forwardRef<HTMLDivElement, FitGridProps>((props, ref) => {
       style={fitGridStyle}
     />
   );
-}) as FitGridComponent;
+});
 
-FitGrid.displayName = 'FitGrid' as const;
+FitGridRoot.displayName = 'FitGrid' as const;
 
 export const FitGridItem = forwardRef<HTMLDivElement, FitGridItemProps>((props, ref) => {
   const { colSpan, pin, className, style, ...restProps } = props;
@@ -222,10 +198,25 @@ export const FitGridItem = forwardRef<HTMLDivElement, FitGridItemProps>((props, 
 FitGridItem.displayName = 'FitGridItem' as const;
 
 /**
- * 配置 `FitGrid` 内部的一个子项。
+ * 使用 CSS Grid 排列子项，并根据当前元素可用空间调整列数。
  *
- * `FitGridItem` 是一个轻量的 CSS Grid item 包装组件。它不进行测量，预期在 `FitGrid` 内部使用。
+ * 列数由每个 item 的最小宽度驱动，而不是由页面或容器断点直接决定。
+ * 这使得它适用于过滤表单、工具面板、卡片列表，以及其他需要适配周围空间的重复控件。
+ *
+ * @example
+ * ```tsx
+ * <FitGrid minItemWidth="14rem" maxColumns={4} colGap="0.75rem">
+ *   <input />
+ *   <input />
+ *   <button>Apply</button>
+ * </FitGrid>
+ * ```
  */
-FitGrid.Item = FitGridItem;
-
-export { FitGrid };
+export const FitGrid = Object.assign(FitGridRoot, {
+  /**
+   * 配置 `FitGrid` 内部的一个子项。
+   *
+   * `FitGridItem` 是一个轻量的 CSS Grid item 包装组件。它不进行测量，预期在 `FitGrid` 内部使用。
+   */
+  Item: FitGridItem,
+});
