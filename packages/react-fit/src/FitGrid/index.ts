@@ -1,4 +1,2 @@
-import './style.css';
-
-export type { FitGridProps } from './FitGrid.tsx';
+export type { FitGridItemProps, FitGridProps } from './FitGrid.tsx';
 export { FitGrid } from './FitGrid.tsx';

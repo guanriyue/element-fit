@@ -5,55 +5,93 @@ import { isUndefined } from '../_internal/isUndefined.ts';
 import { toCSSLength } from '../_internal/toCSSLength.ts';
 
 type FitGridStyle = React.CSSProperties & {
-  '--rf-fit-grid-min-item-w': string;
-  '--rf-fit-grid-col-gap': string;
-  '--rf-fit-grid-row-gap': string;
-  '--rf-fit-grid-min-cols'?: number;
-  '--rf-fit-grid-max-cols'?: number;
+  display: 'grid';
+  gridTemplateColumns: string;
+  columnGap: string;
+  rowGap: string;
 };
 
 /**
- * Props for the `FitGrid` component.
+ * `FitGrid` 组件的属性。
  */
 export type FitGridProps = React.ComponentPropsWithoutRef<typeof Primitive.div> & {
   /**
-   * The minimum inline size each item should keep before the grid reduces the column count.
+   * 每个 item 在减少列数前应尽量保持的最小 inline size。
    */
   minItemWidth: number | string;
 
   /**
-   * The minimum number of columns the grid should try to keep.
+   * Grid 应尝试保持的最小列数。
    *
-   * Invalid values are ignored and warn in development.
+   * 非法值会被忽略，并在开发环境给出警告。
    */
   minColumns?: number;
 
   /**
-   * The maximum number of columns the grid should create.
+   * Grid 最多可创建的列数。
    *
-   * Invalid values are ignored and warn in development.
+   * 非法值会被忽略，并在开发环境给出警告。
    */
   maxColumns?: number;
 
   /**
-   * The space between columns.
+   * 列之间的间距。
    */
   colGap?: number | string;
 
   /**
-   * The space between rows.
+   * 行之间的间距。
    *
-   * Defaults to `colGap` when omitted.
+   * 未传入时默认等于 `colGap`。
    */
   rowGap?: number | string;
 };
 
 /**
- * Arranges children in a CSS grid that adapts its column count to the available element space.
+ * `FitGridItem` 组件的属性。
+ */
+export type FitGridItemProps = React.ComponentPropsWithoutRef<typeof Primitive.div> & {
+  /**
+   * 当前 item 应跨越的列数。
+   *
+   * 使用 `'full'` 可以占据整行。
+   */
+  colSpan?: number | 'full';
+
+  /**
+   * 将当前 item 固定到当前行的最后一列。
+   *
+   * 该属性预期用于 Grid 的最后一个子节点。如果在中间节点上使用，最终布局结果由调用方负责。
+   */
+  pin?: 'row-end';
+};
+
+const getGridTemplateColumns = (
+  minItemWidth: string,
+  minColumns: number | undefined,
+  maxColumns: number | undefined,
+  colGap: string,
+): string => {
+  if (!isUndefined(minColumns) && !isUndefined(maxColumns)) {
+    return `repeat(auto-fit, minmax(min(calc((100% - ${colGap} * (${minColumns} - 1)) / ${minColumns}), max(${minItemWidth}, calc((100% - ${colGap} * (${maxColumns} - 1)) / ${maxColumns}))), 1fr))`;
+  }
+
+  if (!isUndefined(minColumns)) {
+    return `repeat(auto-fit, minmax(min(calc((100% - ${colGap} * (${minColumns} - 1)) / ${minColumns}), ${minItemWidth}), 1fr))`;
+  }
+
+  if (!isUndefined(maxColumns)) {
+    return `repeat(auto-fit, minmax(max(${minItemWidth}, calc((100% - ${colGap} * (${maxColumns} - 1)) / ${maxColumns})), 1fr))`;
+  }
+
+  return `repeat(auto-fit, minmax(${minItemWidth}, 1fr))`;
+};
+
+/**
+ * 使用 CSS Grid 排列子项，并根据当前元素可用空间调整列数。
  *
- * The column count is driven by each item's minimum width instead of page or container
- * breakpoints. This keeps the component useful for filter forms, tool panels, cards, and other
- * repeated controls that need to fit the space around them.
+ * 列数由每个 item 的最小宽度驱动，而不是由页面或容器断点直接决定。
+ * 这使得它适用于过滤表单、工具面板、卡片列表，以及其他需要适配周围空间的重复控件。
  *
  * @example
  * ```tsx
@@ -64,77 +102,113 @@ export type FitGridProps = React.ComponentPropsWithoutRef<typeof Primitive.div> 
  * </FitGrid>
  * ```
  */
-export const FitGrid = (props: FitGridProps) => {
-  const {
-    minItemWidth,
-    minColumns,
-    maxColumns,
-    colGap,
-    rowGap,
-    className,
-    style,
-    ...restProps
-  } = props;
+const FitGrid = (props: FitGridProps) => {
+  const { minItemWidth, minColumns, maxColumns, colGap, rowGap, className, style, ...restProps } =
+    props;
 
-  const validMinColumns = isUndefined(minColumns) || isPositiveInteger(minColumns);
-  const validMaxColumns = isUndefined(maxColumns) || isPositiveInteger(maxColumns);
+  const minColumnsPositive = isPositiveInteger(minColumns);
+  const maxColumnsPositive = isPositiveInteger(maxColumns);
 
   if (process.env.NODE_ENV !== 'production') {
+    const minColumnsUndef = isUndefined(minColumns);
+    const validMinColumns = minColumnsUndef || minColumnsPositive;
+
     if (!validMinColumns) {
       console.warn('[react-fit] FitGrid expected minColumns to be a positive integer.');
     }
   }
 
   if (process.env.NODE_ENV !== 'production') {
+    const maxColumnsUndef = isUndefined(maxColumns);
+    const validMaxColumns = maxColumnsUndef || maxColumnsPositive;
+
     if (!validMaxColumns) {
       console.warn('[react-fit] FitGrid expected maxColumns to be a positive integer.');
     }
   }
 
   if (process.env.NODE_ENV !== 'production') {
-    if (
-      validMinColumns &&
-      validMaxColumns &&
-      minColumns !== undefined &&
-      maxColumns !== undefined
-    ) {
+    if (minColumnsPositive && maxColumnsPositive) {
       if (maxColumns < minColumns) {
         console.warn('[react-fit] FitGrid received maxColumns smaller than minColumns.');
       }
     }
   }
 
+  const cssMinItemWidth = toCSSLength(minItemWidth);
+  const colGapUndef = isUndefined(colGap);
+  const rowGapUndef = isUndefined(rowGap);
+  const cssColGap = colGapUndef ? '0px' : toCSSLength(colGap);
+  const cssRowGap = rowGapUndef ? (colGapUndef ? '0px' : toCSSLength(colGap)) : toCSSLength(rowGap);
+
   const fitGridStyle: FitGridStyle = {
     ...style,
-    '--rf-fit-grid-min-item-w': toCSSLength(minItemWidth),
-    '--rf-fit-grid-col-gap': colGap === undefined ? '0px' : toCSSLength(colGap),
-    '--rf-fit-grid-row-gap':
-      rowGap === undefined
-        ? colGap === undefined
-          ? '0px'
-          : toCSSLength(colGap)
-        : toCSSLength(rowGap),
+    display: 'grid',
+    gridTemplateColumns: getGridTemplateColumns(
+      cssMinItemWidth,
+      minColumnsPositive ? minColumns : undefined,
+      maxColumnsPositive ? maxColumns : undefined,
+      cssColGap,
+    ),
+    columnGap: cssColGap,
+    rowGap: cssRowGap,
   };
 
-  if (validMinColumns && minColumns !== undefined) {
-    fitGridStyle['--rf-fit-grid-min-cols'] = minColumns;
+  return (
+    <Primitive.div {...restProps} className={clsx('rf-fit-grid', className)} style={fitGridStyle} />
+  );
+};
+
+FitGrid.displayName = 'FitGrid' as const;
+
+const FitGridItem = (props: FitGridItemProps) => {
+  const { colSpan, pin, className, style, ...restProps } = props;
+  const colSpanFull = colSpan === 'full';
+  const colSpanPositive = isPositiveInteger(colSpan);
+
+  if (process.env.NODE_ENV !== 'production') {
+    const colSpanUndef = isUndefined(colSpan);
+    const validColSpan = colSpanUndef || colSpanFull || colSpanPositive;
+
+    if (!validColSpan) {
+      console.warn('[react-fit] FitGridItem expected colSpan to be a positive integer or "full".');
+    }
   }
 
-  if (validMaxColumns && maxColumns !== undefined) {
-    fitGridStyle['--rf-fit-grid-max-cols'] = maxColumns;
+  if (process.env.NODE_ENV !== 'production') {
+    if (!isUndefined(pin) && (colSpanFull || colSpanPositive)) {
+      console.warn('[react-fit] FitGridItem received both pin and colSpan. pin takes precedence.');
+    }
+  }
+
+  const itemStyle: React.CSSProperties = {
+    ...style,
+  };
+
+  if (colSpanFull || colSpanPositive) {
+    itemStyle.gridColumn = colSpan === 'full' ? '1 / -1' : `span ${colSpan}`;
+  }
+
+  if (pin === 'row-end') {
+    itemStyle.gridColumn = '-2 / -1';
   }
 
   return (
     <Primitive.div
       {...restProps}
-      className={clsx('rf-fit-grid', className)}
-      data-rf-fit-grid-max-cols={
-        validMaxColumns && maxColumns !== undefined ? '' : undefined
-      }
-      data-rf-fit-grid-min-cols={
-        validMinColumns && minColumns !== undefined ? '' : undefined
-      }
-      style={fitGridStyle}
+      className={clsx('rf-fit-grid-item', className)}
+      style={itemStyle}
     />
   );
 };
+
+FitGridItem.displayName = 'FitGridItem' as const;
+
+/**
+ * 配置 `FitGrid` 内部的一个子项。
+ *
+ * `FitGridItem` 是一个轻量的 CSS Grid item 包装组件。它不进行测量，预期在 `FitGrid` 内部使用。
+ */
+FitGrid.Item = FitGridItem;
+
+export { FitGrid };

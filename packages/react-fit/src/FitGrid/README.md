@@ -27,7 +27,9 @@ import { FitGrid } from '@guanriyue/react-fit/fit-grid';
   <input />
   <input />
   <input />
-  <button>Apply</button>
+  <FitGrid.Item pin="row-end">
+    <button>Apply</button>
+  </FitGrid.Item>
 </FitGrid>
 ```
 
@@ -44,12 +46,44 @@ import { FitGrid } from '@guanriyue/react-fit/fit-grid';
 
 其他合法的 `div` props 会透传给根元素。
 
+## Item
+
+`FitGrid.Item` 用于配置 grid child 的放置方式，也可以通过 `FitGridItem` 命名导出使用。
+
+```tsx
+import { FitGrid, FitGridItem } from '@guanriyue/react-fit/fit-grid';
+```
+
+`colSpan` 支持正整数和 `'full'`：
+
+```tsx
+<FitGrid.Item colSpan={2}>跨 2 列</FitGrid.Item>
+<FitGrid.Item colSpan="full">占据整行</FitGrid.Item>
+```
+
+`pin` 目前支持 `'row-end'`，表示将当前 item 放在当前行的最后一列：
+
+```tsx
+<FitGrid.Item pin="row-end">
+  <button>Search</button>
+  <button>Reset</button>
+</FitGrid.Item>
+```
+
+`pin="row-end"` 预期用于当前布局组的最后一个节点，例如查询表单中的 submit/reset 按钮。如果开发者对中间节点设置
+`pin`，产生的布局结果由开发者自行负责。
+
+当 `colSpan` 和 `pin` 同时传入时，开发环境会给出警告，并且 `pin` 优先。
+
 ## Layout
 
 `FitGrid` 使用 `repeat(auto-fit, minmax(..., 1fr))`。当传入列数限制时，最小 track size 会根据
 `minItemWidth`、`minColumns`、`maxColumns` 和 `colGap` 推导出来。
 
 这使得组件响应的是元素周围的可用空间，而不是 viewport breakpoint。
+
+核心布局样式会以内联样式写入根元素，包括 `display`、`gridTemplateColumns`、`columnGap` 和 `rowGap`。这些样式是
+`FitGrid` 成立所需的结构条件，会覆盖外部传入的同名 `style`。
 
 ## Label 和 Value
 

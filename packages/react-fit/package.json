@@ -4,7 +4,7 @@
   "description": "React components for building UIs that fit, overflow, and adapt to available element space.",
   "type": "module",
   "sideEffects": [
-    "*.css"
+    "**/*.css"
   ],
   "files": [
     "dist",
