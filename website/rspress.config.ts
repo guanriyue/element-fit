@@ -1,5 +1,8 @@
 import * as path from 'node:path';
+import { pluginTailwindcss } from '@rsbuild/plugin-tailwindcss';
 import { defineConfig } from '@rspress/core';
+import { pluginPreview } from '@rspress/plugin-preview';
+import { pluginTwoslash } from '@rspress/plugin-twoslash';
 
 export default defineConfig({
   root: path.join(__dirname, 'docs'),
@@ -20,4 +23,14 @@ export default defineConfig({
       description: 'Element Fit 文档。',
     },
   ],
+  plugins: [pluginTwoslash(), pluginPreview()],
+  globalStyles: path.join(__dirname, 'tailwind.css'),
+  builderConfig: {
+    plugins: [pluginTailwindcss()],
+    resolve: {
+      alias: {
+        '@': path.join(__dirname, 'src'),
+      },
+    },
+  },
 });
