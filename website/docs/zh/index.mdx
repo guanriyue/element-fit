@@ -1,0 +1,22 @@
+---
+description: Element Fit 文档占位页。
+outline: false
+pageType: doc-wide
+---
+
+# Element Fit
+
+Element Fit 提供一组根据元素可用空间自适应的 React 布局组件。
+
+## FitGrid 查询表单
+
+查询表单通常会被放在页面顶部、抽屉、侧栏或卡片内容区中。它面对的不是固定的 viewport
+宽度，而是外层容器留给它的实际空间。
+
+`FitGrid` 适合这类场景：每个查询项只声明自己的最小可用宽度，网格会在当前空间中尽量排列更多列，并在空间不足时自然换行。
+
+下面的示例是一个简单订单查询表单。关键词、状态、时间、负责人和操作按钮都作为网格项参与排列。
+
+```tsx file="<root>/src/demos/fit-grid/query-form.tsx" preview
+
+```
