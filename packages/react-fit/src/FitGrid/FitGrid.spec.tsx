@@ -135,6 +135,22 @@ describe('FitGrid', () => {
   it('exposes FitGrid.Item as FitGridItem', () => {
     expect(FitGrid.Item).toBe(FitGridItem);
   });
+
+  it('forwards refs to the root element', () => {
+    let element: HTMLDivElement | null = null;
+
+    render(
+      <FitGrid
+        ref={(node) => {
+          element = node;
+        }}
+        minItemWidth="12rem"
+      />,
+    );
+
+    expect(element).toBeInstanceOf(HTMLDivElement);
+    expect(element).toHaveClass('rf-fit-grid');
+  });
 });
 
 describe('FitGridItem', () => {
@@ -204,5 +220,20 @@ describe('FitGridItem', () => {
     expect(screen.getByTestId('item')).toHaveStyle({
       gridColumn: '-2 / -1',
     });
+  });
+
+  it('forwards refs to the item element', () => {
+    let element: HTMLDivElement | null = null;
+
+    render(
+      <FitGrid.Item
+        ref={(node) => {
+          element = node;
+        }}
+      />,
+    );
+
+    expect(element).toBeInstanceOf(HTMLDivElement);
+    expect(element).toHaveClass('rf-fit-grid-item');
   });
 });

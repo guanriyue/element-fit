@@ -1,5 +1,6 @@
 import { Primitive } from '@radix-ui/react-primitive';
 import { clsx } from 'clsx';
+import { forwardRef } from 'react';
 import { isPositiveInteger } from '../_internal/isPositiveInteger.ts';
 import { isUndefined } from '../_internal/isUndefined.ts';
 import { toCSSLength } from '../_internal/toCSSLength.ts';
@@ -9,6 +10,16 @@ type FitGridStyle = React.CSSProperties & {
   gridTemplateColumns: string;
   columnGap: string;
   rowGap: string;
+};
+
+type FitGridItemComponent = React.ForwardRefExoticComponent<
+  FitGridItemProps & React.RefAttributes<HTMLDivElement>
+>;
+
+type FitGridComponent = React.ForwardRefExoticComponent<
+  FitGridProps & React.RefAttributes<HTMLDivElement>
+> & {
+  Item: FitGridItemComponent;
 };
 
 /**
@@ -102,7 +113,7 @@ const getGridTemplateColumns = (
  * </FitGrid>
  * ```
  */
-const FitGrid = (props: FitGridProps) => {
+const FitGrid = forwardRef<HTMLDivElement, FitGridProps>((props, ref) => {
   const { minItemWidth, minColumns, maxColumns, colGap, rowGap, className, style, ...restProps } =
     props;
 
@@ -155,13 +166,18 @@ const FitGrid = (props: FitGridProps) => {
   };
 
   return (
-    <Primitive.div {...restProps} className={clsx('rf-fit-grid', className)} style={fitGridStyle} />
+    <Primitive.div
+      {...restProps}
+      ref={ref}
+      className={clsx('rf-fit-grid', className)}
+      style={fitGridStyle}
+    />
   );
-};
+}) as FitGridComponent;
 
 FitGrid.displayName = 'FitGrid' as const;
 
-const FitGridItem = (props: FitGridItemProps) => {
+export const FitGridItem = forwardRef<HTMLDivElement, FitGridItemProps>((props, ref) => {
   const { colSpan, pin, className, style, ...restProps } = props;
   const colSpanFull = colSpan === 'full';
   const colSpanPositive = isPositiveInteger(colSpan);
@@ -196,11 +212,12 @@ const FitGridItem = (props: FitGridItemProps) => {
   return (
     <Primitive.div
       {...restProps}
+      ref={ref}
       className={clsx('rf-fit-grid-item', className)}
       style={itemStyle}
     />
   );
-};
+});
 
 FitGridItem.displayName = 'FitGridItem' as const;
 
