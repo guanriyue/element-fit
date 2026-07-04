@@ -71,6 +71,7 @@ export default defineConfig({
     lib: {
       entry: {
         index: resolve(root, 'src/index.ts'),
+        'CompactGrid/index': resolve(root, 'src/CompactGrid/index.ts'),
         'FitGrid/index': resolve(root, 'src/FitGrid/index.ts'),
       },
       formats: ['es'],

@@ -22,6 +22,10 @@
     "./fit-grid": {
       "types": "./src/FitGrid/index.ts",
       "import": "./src/FitGrid/index.ts"
+    },
+    "./compact-grid": {
+      "types": "./src/CompactGrid/index.ts",
+      "import": "./src/CompactGrid/index.ts"
     }
   },
   "scripts": {
@@ -57,11 +61,16 @@
       "./fit-grid": {
         "types": "./dist/FitGrid/index.d.ts",
         "import": "./dist/FitGrid/index.js"
+      },
+      "./compact-grid": {
+        "types": "./dist/CompactGrid/index.d.ts",
+        "import": "./dist/CompactGrid/index.js"
       }
     }
   },
   "dependencies": {
     "@guanriyue/resize-observer-hub": "workspace:*",
+    "@radix-ui/react-compose-refs": "^1.1.3",
     "@radix-ui/react-primitive": "^2.1.7",
     "clsx": "^2.1.1"
   },
