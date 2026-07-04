@@ -1,6 +1,7 @@
 import { Primitive } from '@radix-ui/react-primitive';
 import { clsx } from 'clsx';
 import { forwardRef } from 'react';
+import { getFitGridTemplateColumns } from '../_internal/getFitGridTemplateColumns.ts';
 import { isPositiveInteger } from '../_internal/isPositiveInteger.ts';
 import { isUndefined } from '../_internal/isUndefined.ts';
 import { toCSSLength } from '../_internal/toCSSLength.ts';
@@ -47,7 +48,7 @@ export interface FitGridProps extends PrimitiveDivProps {
    * 未传入时默认等于 `colGap`。
    */
   rowGap?: number | string;
-};
+}
 
 /**
  * `FitGridItem` 组件的属性。
@@ -66,28 +67,7 @@ export interface FitGridItemProps extends PrimitiveDivProps {
    * 该属性预期用于 Grid 的最后一个子节点。如果在中间节点上使用，最终布局结果由调用方负责。
    */
   pin?: 'row-end';
-};
-
-const getGridTemplateColumns = (
-  minItemWidth: string,
-  minColumns: number | undefined,
-  maxColumns: number | undefined,
-  colGap: string,
-): string => {
-  if (!isUndefined(minColumns) && !isUndefined(maxColumns)) {
-    return `repeat(auto-fit, minmax(min(calc((100% - ${colGap} * (${minColumns} - 1)) / ${minColumns}), max(${minItemWidth}, calc((100% - ${colGap} * (${maxColumns} - 1)) / ${maxColumns}))), 1fr))`;
-  }
-
-  if (!isUndefined(minColumns)) {
-    return `repeat(auto-fit, minmax(min(calc((100% - ${colGap} * (${minColumns} - 1)) / ${minColumns}), ${minItemWidth}), 1fr))`;
-  }
-
-  if (!isUndefined(maxColumns)) {
-    return `repeat(auto-fit, minmax(max(${minItemWidth}, calc((100% - ${colGap} * (${maxColumns} - 1)) / ${maxColumns})), 1fr))`;
-  }
-
-  return `repeat(auto-fit, minmax(${minItemWidth}, 1fr))`;
-};
+}
 
 const FitGridRoot = forwardRef<HTMLDivElement, FitGridProps>((props, ref) => {
   const { minItemWidth, minColumns, maxColumns, colGap, rowGap, className, style, ...restProps } =
@@ -131,7 +111,7 @@ const FitGridRoot = forwardRef<HTMLDivElement, FitGridProps>((props, ref) => {
   const fitGridStyle: FitGridStyle = {
     ...style,
     display: 'grid',
-    gridTemplateColumns: getGridTemplateColumns(
+    gridTemplateColumns: getFitGridTemplateColumns(
       cssMinItemWidth,
       minColumnsPositive ? minColumns : undefined,
       maxColumnsPositive ? maxColumns : undefined,
