@@ -15,11 +15,12 @@ import { isPositiveInteger } from '../_internal/isPositiveInteger.ts';
 import { isUndefined } from '../_internal/isUndefined.ts';
 import { toCSSLength } from '../_internal/toCSSLength.ts';
 import type { PrimitiveDivProps } from '../_internal/types.ts';
-import type { CompactGridState, CompactGridStore } from './store.ts';
+import type { CompactGridItemColSpan, CompactGridState, CompactGridStore } from './store.ts';
 import { createCompactGridStore } from './store.ts';
 
 type CompactGridStyle = React.CSSProperties & {
   display: 'grid';
+  gridAutoColumns: string;
   gridTemplateColumns: string;
   columnGap: string;
   rowGap: string;
@@ -87,6 +88,19 @@ export interface CompactGridProps extends PrimitiveDivProps {
 }
 
 /**
+ * `CompactGrid.Item` 的属性。
+ */
+export interface CompactGridItemProps extends PrimitiveDivProps {
+  /**
+   * 当前 item 应跨越的列数。
+   *
+   * 使用 `'full'` 可以占据整行。数字跨列只会在当前显式列数内生效；
+   * 当声明的列数超过当前显式列数时，会按整行处理，避免创建可见的隐式列。
+   */
+  colSpan?: CompactGridItemColSpan;
+}
+
+/**
  * `CompactGrid.Extra` 的属性。
  *
  * `Extra` 用来声明额外内容的默认位置。非紧凑模式下，它会作为普通 grid cell 渲染；
@@ -148,6 +162,11 @@ const CompactGridRoot = forwardRef<HTMLDivElement, CompactGridProps>((props, ref
   const compactGridStyle: CompactGridStyle = {
     ...style,
     display: 'grid',
+    // 数字 colSpan 在当前显式列数不足时会创建隐式列。如果隐式列拥有宽度，
+    // `getComputedStyle(root).gridTemplateColumns` 会把它也序列化出来，导致 store
+    // 误以为 root 拥有更多列。把隐式列压成 0px 后，`getColumnCount` 可以在统计时
+    // 忽略这些 track，从而保持“列数只来自组件自身模板”的语义。
+    gridAutoColumns: '0px',
     gridTemplateColumns: getFitGridTemplateColumns(
       cssMinItemWidth,
       minColumnsPositive ? minColumns : undefined,
@@ -166,6 +185,76 @@ const CompactGridRoot = forwardRef<HTMLDivElement, CompactGridProps>((props, ref
 });
 
 CompactGridRoot.displayName = 'CompactGrid' as const;
+
+/**
+ * 声明一个参与 `CompactGrid` 紧凑计算的 grid item。
+ *
+ * `Item` 可以通过 `colSpan` 告诉组件自己占据几列。未设置时按 1 列计算。
+ * 如果数字 `colSpan` 超过当前显式列数，组件会把它视为整行。
+ *
+ * @example
+ * ```tsx
+ * <CompactGrid.Item colSpan={2}>
+ *   <Field name="range" />
+ * </CompactGrid.Item>
+ * ```
+ */
+export const CompactGridItem = forwardRef<HTMLDivElement, CompactGridItemProps>((props, ref) => {
+  const { colSpan, style, ...restProps } = props;
+  const store = useCompactGridStore('CompactGrid.Item');
+  const itemElementRef = useRef<HTMLDivElement | null>(null);
+  const unregisterItemRef = useRef<(() => void) | null>(null);
+  const colSpanFull = colSpan === 'full';
+  const colSpanPositive = isPositiveInteger(colSpan);
+  const gridColumn = useCompactGridSelector('CompactGrid.Item', (state) => {
+    if (colSpanFull) {
+      return '1 / -1';
+    }
+
+    if (typeof colSpan === 'number' && colSpanPositive) {
+      return state.columnCount <= 0 || colSpan > state.columnCount ? '1 / -1' : `span ${colSpan}`;
+    }
+
+    return undefined;
+  });
+
+  if (process.env.NODE_ENV !== 'production') {
+    const colSpanUndef = isUndefined(colSpan);
+    const validColSpan = colSpanUndef || colSpanFull || colSpanPositive;
+
+    if (!validColSpan) {
+      console.warn('[react-fit] CompactGridItem expected colSpan to be a positive integer or "full".');
+    }
+  }
+
+  const registerItemRef = useCallback(
+    (item: HTMLDivElement | null) => {
+      if (unregisterItemRef.current) {
+        unregisterItemRef.current();
+        unregisterItemRef.current = null;
+      }
+
+      if (item !== null) {
+        unregisterItemRef.current = store.registerItem(item, {
+          colSpan: colSpanFull || colSpanPositive ? colSpan : undefined,
+        });
+      }
+    },
+    [colSpan, colSpanFull, colSpanPositive, store],
+  );
+  const itemRef = useComposedRefs(ref, itemElementRef, registerItemRef);
+  const itemStyle: React.CSSProperties = {
+    ...style,
+  };
+
+  if (!isUndefined(gridColumn)) {
+    itemStyle.gridColumn = gridColumn;
+  }
+
+  return <Primitive.div {...restProps} ref={itemRef} style={itemStyle} />;
+});
+
+CompactGridItem.displayName = 'CompactGridItem' as const;
 
 /**
  * 声明 `CompactGrid` 的额外内容。
@@ -271,6 +360,7 @@ CompactGridExtraSlot.displayName = 'CompactGridExtraSlot' as const;
  * 使用 CSS Grid 排列子项，并在特定列数下将 `Extra` 渲染到 `ExtraSlot` 中。
  *
  * 当普通 grid cell 数量刚好填满当前行时，`Extra` 会进入紧凑模式并渲染在 `ExtraSlot` 的位置。
+ * `CompactGrid.Item` 的数字 `colSpan` 不会扩展根节点的列矩阵；越界时会退化为整行。
  *
  * @example
  * ```tsx
@@ -289,6 +379,11 @@ CompactGridExtraSlot.displayName = 'CompactGridExtraSlot' as const;
  * ```
  */
 export const CompactGrid = Object.assign(CompactGridRoot, {
+  /**
+   * 声明参与紧凑计算的 grid item。
+   */
+  Item: CompactGridItem,
+
   /**
    * 提供默认位置和 children。非紧凑模式下它会作为一个 grid cell 渲染。
    */

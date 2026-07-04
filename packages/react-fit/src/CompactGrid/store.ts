@@ -5,7 +5,21 @@ import { isDef } from '../_internal/isDef.ts';
 type CompactGridListener = () => void;
 
 /**
- * `CompactGrid` 的状态。
+ * `CompactGrid.Item` 可以声明的跨列数量。
+ */
+export type CompactGridItemColSpan = number | 'full';
+
+type CompactGridItemOptions = {
+  colSpan: CompactGridItemColSpan | undefined;
+};
+
+type CompactGridLayoutItem = {
+  element: Element;
+  colSpan: CompactGridItemColSpan | undefined;
+};
+
+/**
+ * `CompactGrid` 的状态快照。
  */
 export type CompactGridState = {
   /**
@@ -24,6 +38,10 @@ export type CompactGridState = {
    * 是否真正进入紧凑模式。
    */
   compact: boolean;
+  /**
+   * 当前 root 的显式列数。
+   */
+  columnCount: number;
 };
 
 /**
@@ -34,7 +52,9 @@ export type CompactGridStore = {
   subscribe: (listener: CompactGridListener) => () => void;
   setExtra: (extra: React.ReactNode) => void;
   setRootElement: (root: HTMLElement | null) => void;
+  registerItem: (item: HTMLElement, options: CompactGridItemOptions) => () => void;
   registerSlot: (slot: HTMLElement) => () => void;
+  measure: () => void;
 };
 
 const hasExtra = (extra: React.ReactNode): boolean => {
@@ -49,37 +69,89 @@ const getCompact = (
   return hasExtra(extra) && activeSlot !== null && layoutCompact;
 };
 
+const getItemSpan = (
+  colSpan: CompactGridItemColSpan | undefined,
+  columnCount: number,
+): number => {
+  if (colSpan === 'full') {
+    return columnCount;
+  }
+
+  if (typeof colSpan === 'number' && Number.isInteger(colSpan) && colSpan > 0) {
+    return Math.min(colSpan, columnCount);
+  }
+
+  return 1;
+};
+
+const getLayoutItems = (
+  root: Element,
+  items: Map<HTMLElement, CompactGridItemOptions>,
+): CompactGridLayoutItem[] => {
+  const layoutItems: CompactGridLayoutItem[] = [];
+
+  for (let index = 0; index < root.children.length; index += 1) {
+    const child = root.children.item(index);
+
+    if (child === null || child.hasAttribute('data-rf-compact-grid-extra')) {
+      continue;
+    }
+
+    const registeredItem = child instanceof HTMLElement ? items.get(child) : undefined;
+
+    layoutItems.push({
+      element: child,
+      colSpan: registeredItem?.colSpan,
+    });
+  }
+
+  return layoutItems;
+};
+
+const getLayoutItemsCompact = (
+  layoutItems: CompactGridLayoutItem[],
+  slot: HTMLElement,
+  columnCount: number,
+): boolean => {
+  const lastItem = layoutItems.at(-1)?.element;
+
+  // biome-ignore lint/complexity/useOptionalChain: 无需使用
+  if (!lastItem || !lastItem.contains(slot)) {
+    return false;
+  }
+
+  if (columnCount <= 0) {
+    return false;
+  }
+
+  let rowUsed = 0;
+
+  for (const item of layoutItems) {
+    const span = getItemSpan(item.colSpan, columnCount);
+
+    if (rowUsed + span > columnCount) {
+      rowUsed = span;
+    } else {
+      rowUsed += span;
+    }
+  }
+
+  return rowUsed === columnCount;
+};
+
 const getLayoutCompact = (
   root: Element | null,
   slot: HTMLElement | null,
+  items: Map<HTMLElement, CompactGridItemOptions>,
+  columnCount: number,
 ): boolean => {
   if (!root || !slot || !root.children.length) {
     return false;
   }
 
-  let regularCellCount = 0;
-  let lastCell: Element | null = null;
+  const layoutItems = getLayoutItems(root, items);
 
-  for (let index = 0; index < root.children.length; index += 1) {
-    const child = root.children.item(index);
-
-    if (child !== null && !child.hasAttribute('data-rf-compact-grid-extra')) {
-      regularCellCount += 1;
-      lastCell = child;
-    }
-  }
-
-  if (regularCellCount === 0 || lastCell === null) {
-    return false;
-  }
-
-  const columnCount = getColumnCount(getComputedStyle(root).gridTemplateColumns);
-
-  if (columnCount <= 0 || regularCellCount % columnCount !== 0) {
-    return false;
-  }
-
-  return lastCell.contains(slot);
+  return getLayoutItemsCompact(layoutItems, slot, columnCount);
 };
 
 const getLastSlot = (
@@ -113,41 +185,19 @@ const getLastSlot = (
   return lastSlot;
 };
 
-const createState = (
+const createSnapshot = (
   extra: React.ReactNode,
   activeSlot: HTMLElement | null,
   layoutCompact: boolean,
+  columnCount: number,
 ): CompactGridState => {
   return {
     extra,
     activeSlot,
     layoutCompact,
     compact: getCompact(extra, activeSlot, layoutCompact),
+    columnCount,
   };
-};
-
-const createNextState = (
-  prevState: CompactGridState,
-  patchState: Partial<CompactGridState>,
-): CompactGridState => {
-  const nextState = {
-    ...prevState,
-    ...patchState,
-  };
-
-  return {
-    ...nextState,
-    compact: getCompact(nextState.extra, nextState.activeSlot, nextState.layoutCompact),
-  };
-};
-
-const isSameState = (prevState: CompactGridState, nextState: CompactGridState): boolean => {
-  return (
-    prevState.extra === nextState.extra &&
-    prevState.activeSlot === nextState.activeSlot &&
-    prevState.layoutCompact === nextState.layoutCompact &&
-    prevState.compact === nextState.compact
-  );
 };
 
 /**
@@ -156,8 +206,9 @@ const isSameState = (prevState: CompactGridState, nextState: CompactGridState): 
 export const createCompactGridStore = (): CompactGridStore => {
   let rootElement: HTMLElement | null = null;
   let unobserveResize: (() => void) | null = null;
-  let state = createState(null, null, false);
+  let snapshot = createSnapshot(null, null, false, 0);
   const listeners = new Set<CompactGridListener>();
+  const items = new Map<HTMLElement, CompactGridItemOptions>();
   const slots = new Set<HTMLElement>();
 
   const notify = () => {
@@ -166,29 +217,33 @@ export const createCompactGridStore = (): CompactGridStore => {
     }
   };
 
-  const commit = (patchState: Partial<CompactGridState>) => {
-    const nextState = createNextState(state, patchState);
-
-    if (isSameState(state, nextState)) {
+  const commit = (nextSnapshot: CompactGridState) => {
+    if (
+      snapshot.extra === nextSnapshot.extra &&
+      snapshot.activeSlot === nextSnapshot.activeSlot &&
+      snapshot.layoutCompact === nextSnapshot.layoutCompact &&
+      snapshot.compact === nextSnapshot.compact &&
+      snapshot.columnCount === nextSnapshot.columnCount
+    ) {
       return;
     }
 
-    state = nextState;
+    snapshot = nextSnapshot;
     notify();
   };
 
-  const sync = () => {
+  const sync = (extra: React.ReactNode = snapshot.extra) => {
     const activeSlot = getLastSlot(rootElement, slots);
-    const layoutCompact = getLayoutCompact(rootElement, activeSlot);
+    const columnCount = rootElement
+      ? getColumnCount(getComputedStyle(rootElement).gridTemplateColumns)
+      : 0;
+    const layoutCompact = getLayoutCompact(rootElement, activeSlot, items, columnCount);
 
-    commit({
-      activeSlot,
-      layoutCompact,
-    });
+    commit(createSnapshot(extra, activeSlot, layoutCompact, columnCount));
   };
 
   return {
-    getSnapshot: () => state,
+    getSnapshot: () => snapshot,
     subscribe: (listener) => {
       listeners.add(listener);
 
@@ -197,9 +252,7 @@ export const createCompactGridStore = (): CompactGridStore => {
       };
     },
     setExtra: (extra) => {
-      commit({
-        extra,
-      });
+      sync(extra);
     },
     setRootElement: (root) => {
       if (unobserveResize) {
@@ -217,6 +270,15 @@ export const createCompactGridStore = (): CompactGridStore => {
 
       sync();
     },
+    registerItem: (item, options) => {
+      items.set(item, options);
+      sync();
+
+      return () => {
+        items.delete(item);
+        sync();
+      };
+    },
     registerSlot: (slot) => {
       slots.add(slot);
       sync();
@@ -226,5 +288,6 @@ export const createCompactGridStore = (): CompactGridStore => {
         sync();
       };
     },
+    measure: sync,
   };
 };
