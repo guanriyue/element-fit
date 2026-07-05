@@ -54,7 +54,6 @@ export type CompactGridStore = {
   setRootElement: (root: HTMLElement | null) => void;
   registerItem: (item: HTMLElement, options: CompactGridItemOptions) => () => void;
   registerSlot: (slot: HTMLElement) => () => void;
-  measure: () => void;
 };
 
 const hasExtra = (extra: React.ReactNode): boolean => {
@@ -282,6 +281,5 @@ export const createCompactGridStore = (): CompactGridStore => {
         sync();
       };
     },
-    measure: sync,
   };
 };
