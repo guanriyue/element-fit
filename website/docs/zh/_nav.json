@@ -1,1 +1,15 @@
-[]
+[
+  {
+    "text": "指南",
+    "items": [
+      {
+        "text": "首页",
+        "link": "/"
+      },
+      {
+        "text": "CompactGrid",
+        "link": "/compact-grid"
+      }
+    ]
+  }
+]

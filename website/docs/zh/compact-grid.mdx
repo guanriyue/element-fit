@@ -1,0 +1,27 @@
+---
+description: CompactGrid 会在空间紧凑时把额外内容移动到声明的插槽位置。
+outline: false
+pageType: doc-wide
+---
+
+# CompactGrid
+
+`CompactGrid` 使用和 `FitGrid` 相同的自适应网格逻辑，但额外提供了 `Extra` 和 `ExtraSlot`。
+
+当默认布局还有空间时，`Extra` 会作为独立网格项渲染；当普通网格项刚好填满当前行时，`Extra` 会移动到最后一个普通网格项中的 `ExtraSlot`，避免额外内容单独掉到新的一行。
+
+下面的示例把“重置”按钮作为额外操作。宽度充足时它占据独立列；空间紧凑时它会收进“状态”筛选项右侧。
+
+```tsx file="<root>/src/demos/compact-grid/filter-actions.tsx" preview
+
+```
+
+## 跨列 Item
+
+`CompactGrid.Item` 可以通过 `colSpan` 声明当前项需要跨越的列数。传入数字时会跨指定列数，传入 `'full'` 时会占满整行。
+
+下面的示例中，“联系地址”跨 2 列，“备注”占满整行。带虚线边框的区域用于观察跨列范围。
+
+```tsx file="<root>/src/demos/compact-grid/col-span.tsx" preview
+
+```
