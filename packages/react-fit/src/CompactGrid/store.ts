@@ -69,10 +69,7 @@ const getCompact = (
   return hasExtra(extra) && activeSlot !== null && layoutCompact;
 };
 
-const getItemSpan = (
-  colSpan: CompactGridItemColSpan | undefined,
-  columnCount: number,
-): number => {
+const getItemSpan = (colSpan: CompactGridItemColSpan | undefined, columnCount: number): number => {
   if (colSpan === 'full') {
     return columnCount;
   }
@@ -154,10 +151,7 @@ const getLayoutCompact = (
   return getLayoutItemsCompact(layoutItems, slot, columnCount);
 };
 
-const getLastSlot = (
-  root: HTMLElement | null,
-  slots: Set<HTMLElement>,
-): HTMLElement | null => {
+const getLastSlot = (root: HTMLElement | null, slots: Set<HTMLElement>): HTMLElement | null => {
   if (root === null || slots.size === 0) {
     return null;
   }
