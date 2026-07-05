@@ -23,6 +23,10 @@
       "types": "./src/FitGrid/index.ts",
       "import": "./src/FitGrid/index.ts"
     },
+    "./fit-switch": {
+      "types": "./src/FitSwitch/index.ts",
+      "import": "./src/FitSwitch/index.ts"
+    },
     "./compact-grid": {
       "types": "./src/CompactGrid/index.ts",
       "import": "./src/CompactGrid/index.ts"
@@ -61,6 +65,10 @@
       "./fit-grid": {
         "types": "./dist/FitGrid/index.d.ts",
         "import": "./dist/FitGrid/index.js"
+      },
+      "./fit-switch": {
+        "types": "./dist/FitSwitch/index.d.ts",
+        "import": "./dist/FitSwitch/index.js"
       },
       "./compact-grid": {
         "types": "./dist/CompactGrid/index.d.ts",
