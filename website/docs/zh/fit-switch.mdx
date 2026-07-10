@@ -1,0 +1,17 @@
+---
+description: FitSwitch 会根据完整视图是否能放入当前空间，在两套完整表达之间切换。
+outline: false
+pageType: doc-wide
+---
+
+# FitSwitch
+
+`FitSwitch` 用来声明两套完整视图：`Collapsed` 和 `Expanded`。它会测量 `Expanded` 视图需要的宽度，并使用两个视图共同的父元素作为可用宽度容器。
+
+当 `Expanded` 能放下时，显示完整视图；当放不下时，切换到 `Collapsed` 视图。
+
+下面的 tabs 示例中，完整视图显示“图标 + 文案”，紧凑视图只显示图标。
+
+```tsx file="<root>/src/demos/fit-switch/tabs.tsx" preview
+
+```
