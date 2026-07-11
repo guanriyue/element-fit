@@ -74,6 +74,7 @@ export default defineConfig({
         'CompactGrid/index': resolve(root, 'src/CompactGrid/index.ts'),
         'FitGrid/index': resolve(root, 'src/FitGrid/index.ts'),
         'FitSwitch/index': resolve(root, 'src/FitSwitch/index.ts'),
+        'InlineOverflow/index': resolve(root, 'src/InlineOverflow/index.ts'),
       },
       formats: ['es'],
       fileName: (_, entryName) => `${entryName}.js`,

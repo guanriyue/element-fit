@@ -30,6 +30,10 @@
     "./compact-grid": {
       "types": "./src/CompactGrid/index.ts",
       "import": "./src/CompactGrid/index.ts"
+    },
+    "./inline-overflow": {
+      "types": "./src/InlineOverflow/index.ts",
+      "import": "./src/InlineOverflow/index.ts"
     }
   },
   "scripts": {
@@ -73,6 +77,10 @@
       "./compact-grid": {
         "types": "./dist/CompactGrid/index.d.ts",
         "import": "./dist/CompactGrid/index.js"
+      },
+      "./inline-overflow": {
+        "types": "./dist/InlineOverflow/index.d.ts",
+        "import": "./dist/InlineOverflow/index.js"
       }
     }
   },
