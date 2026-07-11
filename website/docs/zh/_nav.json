@@ -13,6 +13,10 @@
       {
         "text": "FitSwitch",
         "link": "/fit-switch"
+      },
+      {
+        "text": "InlineOverflow",
+        "link": "/inline-overflow"
       }
     ]
   }

@@ -1,0 +1,95 @@
+---
+description: InlineOverflow 用于观测单行内容是否发生横向溢出。
+outline: false
+pageType: doc-wide
+---
+
+# InlineOverflow
+
+`InlineOverflow` 用于测量单行内容是否发生横向溢出，并根据派生的 `overflow` 状态组合附属 UI。它不内置 Tooltip、Popover、展开按钮或具体布局。
+
+它适合表格单元格、名称、路径和标签等宽度受限的单行内容。不适合多行截断、纵向书写模式、复杂 transform 或需要反事实测量的场景。
+
+## 导入
+
+```tsx
+import { InlineOverflow } from '@guanriyue/react-fit/inline-overflow';
+```
+
+## 基础用法
+
+Root 不提供默认布局样式。调用方需要让 Root 形成可测量的盒子，并决定 Content 如何获得和收缩宽度。下面的示例使用 `inline-flex` 和 `min-w-0` 建立单行省略布局。
+
+## 宽容器
+
+```tsx file="<root>/src/demos/inline-overflow/wide.tsx" preview
+
+```
+
+## 窄容器
+
+```tsx file="<root>/src/demos/inline-overflow/narrow.tsx" preview
+
+```
+
+首次可信测量完成后，`onOverflowChange` 会调用。之后仅在布尔状态变化，或者 Root、Content 元素替换并完成新的首次测量时调用。溢出时，Root 带有 `data-overflow` attribute；Content 和 Accessory 不重复暴露该状态。
+
+## Hover 展示完整内容
+
+```tsx file="<root>/src/demos/inline-overflow/hover.tsx" preview
+
+```
+
+Tooltip 不是组件内置能力。示例中使用 `onOverflowChange` 控制 Tooltip 是否可打开；未溢出时保持关闭。
+
+## Accessory
+
+Accessory 只根据 `overflow` 状态显示或隐藏，不参与溢出判定。未溢出时，Accessory 不渲染 DOM 节点；溢出后才挂载并进入调用方定义的布局。
+
+一个 Root 可以包含多个 Accessory。Accessory 必须位于对应 Root 的 React context 中，但 DOM 布局位置不需要与 Content 相邻或同行。
+
+### 同行
+
+```tsx file="<root>/src/demos/inline-overflow/accessory.tsx" preview
+
+```
+
+### 单独一行
+
+```tsx file="<root>/src/demos/inline-overflow/accessory-separate-row.tsx" preview
+
+```
+
+## asChild
+
+Root、Content 和 Accessory 都支持 `asChild`。组件会把 ref、状态属性和核心行为样式合并到唯一 child 上。Content 仍是唯一的测量节点。
+
+```tsx file="<root>/src/demos/inline-overflow/as-child.tsx" preview
+
+```
+
+## 多个 Inline 节点
+
+```tsx file="<root>/src/demos/inline-overflow/inline-nodes.tsx" preview
+
+```
+
+Content 内可以包含多个 inline / inline-block / inline-flex 节点。组件只测量 Content 这个节点本身，因此仍应保证一个 Root 只有一个 Content。
+
+## 布局要点
+
+- Content 内置 `white-space: nowrap`、`overflow: hidden` 和 `text-overflow: ellipsis`。
+- Root 不提供默认样式，需要由调用方提供宽度约束。
+- flex 布局通常需要为 Content 设置 `min-width: 0`。
+- grid 布局通常需要使用 `minmax(0, 1fr)`，或者为 Content 设置 `min-width: 0`。
+- Root padding 会参与测量；组件比较 Content 的 `scrollWidth` 与 Root 扣除 inline padding 后的 content box width。
+
+## 观测边界
+
+组件使用 ResizeObserver 监听 Root 和 Content 的尺寸变化，并使用 MutationObserver 监听 Content subtree 中的文本和子节点变化。MutationObserver 不观察 attributes；仅修改 class、style、继承样式、已加载字体或伪元素内容时，如果 Root 和 Content 的盒子尺寸都没有变化，组件不保证重新测量。
+
+首次客户端测量前，内部 overflow 状态为 `false`，`data-overflow` 不存在，Accessory 不渲染。当前不提供 `defaultOverflow`、受控 `overflow` 或手动 remeasure API。
+
+这里的“反事实测量”指测量一个当前 DOM 布局里并不存在的假设状态。例如：Accessory 还没有渲染，但调用方想提前知道“如果 Accessory 显示并占掉一部分宽度，Content 会不会溢出”。这需要临时构造或模拟另一种布局再测量。`InlineOverflow` 不处理这种模式，它只测量当前 Root 与 Content 形成的真实布局，再根据结果决定 Accessory 是否渲染。
+
+在极限临界范围内，浏览器可能已经绘制 ellipsis，但 JavaScript 读取到的 `scrollWidth` 和 `clientWidth` 仍相同。组件使用固定 `0.5px` EPSILON 减少比较抖动，但无法恢复浏览器没有暴露的亚像素 scroll width。
