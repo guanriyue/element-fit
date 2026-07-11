@@ -61,7 +61,7 @@ describe('measureInlineOverflow', () => {
     } as CSSStyleDeclaration);
 
     expect(measureInlineOverflow({ root, content })).toEqual({
-      overflow: false,
+      overflow: true,
     });
   });
 });
@@ -157,7 +157,7 @@ describe('InlineOverflow', () => {
 
     expect(onOverflowChange).toHaveBeenCalledTimes(1);
 
-    setElementWidth(contentElement, 100, 100);
+    setElementWidth(contentElement, 99, 99);
     act(() => {
       nativeResizeObserver?.emit([{ target: contentElement }]);
     });

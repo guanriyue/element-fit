@@ -98,7 +98,9 @@ Root、Content 和 Accessory 都支持 `asChild`。组件会将 ref、状态属�
 `minmax(0, 1fr)`，或者同样为 Content 设置 `min-width: 0`。
 
 Root padding 会参与测量。组件比较 Content 的 `scrollWidth` 与 Root 扣除 inline padding 后的
-content box width，并使用固定的 `0.5px` EPSILON 减少临界值抖动。
+content box width。两者严格相等且 Content 非空时，组件会使用 Range width 进行高精度补充测量。
+Range 可以覆盖普通单行 flow 中的文本、元素和混合内容，但它不是任意 DOM 子树的 intrinsic width；margin、
+伪元素、定位、transform 和多行布局仍不属于可靠测量范围。
 
 ## Observation
 
@@ -133,5 +135,5 @@ CSSWG 的 [issue #4123: It should be detectable whether an element ellipsized th
 记录了同一个浏览器平台问题：在 ellipsis 出现的像素临界点，尺寸取整可能使 `scrollWidth`、`clientWidth`
 甚至 DOMRect 的查询结果相同。
 
-固定的 `0.5px` EPSILON 用于减少数值比较抖动，但无法恢复浏览器没有暴露的亚像素 scroll width，
-因此当前没有可靠方式完全处理该极限情况。
+Range fallback 可以覆盖部分尺寸取整造成的漏判，但不同浏览器的文本布局信息仍可能存在差异，因此当前无法保证
+完全处理所有极限情况。

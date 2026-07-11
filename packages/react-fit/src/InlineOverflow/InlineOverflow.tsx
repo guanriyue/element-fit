@@ -68,15 +68,26 @@ export type InlineOverflowContentProps = React.ComponentPropsWithoutRef<typeof P
  */
 export type InlineOverflowAccessoryProps = React.ComponentPropsWithoutRef<typeof Primitive.span>;
 
+type InlineOverflowInternalProps = InlineOverflowProps & {
+  __debugDisableRangeFallback?: boolean;
+};
+
 const InlineOverflowRoot = forwardRef<HTMLElement, InlineOverflowProps>((props, forwardedRef) => {
-  const { asChild, children, onOverflowChange, ...rootProps } = props;
+  const {
+    __debugDisableRangeFallback,
+    asChild,
+    children,
+    onOverflowChange,
+    ...rootProps
+  } = props as InlineOverflowInternalProps;
   // biome-ignore lint/correctness/useExhaustiveDependencies: 初始化选项
   const store = useMemo(() => {
-    return createInlineOverflowStore(onOverflowChange);
+    return createInlineOverflowStore(onOverflowChange, __debugDisableRangeFallback === true);
   }, []);
 
   useEffect(() => {
     store.setOnOverflowChange(onOverflowChange);
+    store.setDisableRangeFallback(__debugDisableRangeFallback === true);
 
     return () => {
       store.setOnOverflowChange(undefined);

@@ -1,4 +1,5 @@
 import { isNil } from "../_internal/isNil";
+import { measureInlineOverflowWithRange } from './measureInlineOverflowWithRange.ts';
 
 /**
  * 描述 InlineOverflow 的单行横向溢出测量结果。
@@ -9,8 +10,6 @@ export type InlineOverflowMeasure = {
    */
   overflow: boolean;
 };
-
-const INLINE_OVERFLOW_EPSILON = 0.5;
 
 export const EMPTY_INLINE_OVERFLOW_MEASURE: InlineOverflowMeasure = {
   overflow: false,
@@ -24,6 +23,7 @@ export const measureInlineOverflowWithRootContentBoxWidth = (
     root: HTMLElement | null;
     content: HTMLElement | null;
     rootContentBoxWidth: number | null;
+    disableRangeFallback?: boolean;
   },
 ): InlineOverflowMeasure => {
   const { root, content } = params;
@@ -43,12 +43,11 @@ export const measureInlineOverflowWithRootContentBoxWidth = (
     rootContentBoxWidth = Math.max(0, rootWidth - paddingInlineStart - paddingInlineEnd);
   }
 
-  const contentScrollWidth = content.scrollWidth;
-  const overflow = contentScrollWidth > rootContentBoxWidth + INLINE_OVERFLOW_EPSILON;
-
-  return {
-    overflow,
-  };
+  return measureInlineOverflowWithRange({
+    content,
+    rootContentBoxWidth,
+    disableRangeFallback: params.disableRangeFallback,
+  });
 };
 
 /**

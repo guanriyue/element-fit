@@ -22,6 +22,7 @@ export type InlineOverflowStore = {
   setRootElement: (element: HTMLElement | null) => void;
   setContentElement: (element: HTMLElement | null) => void;
   setOnOverflowChange: (handler: InlineOverflowChangeHandler | undefined) => void;
+  setDisableRangeFallback: (disabled: boolean) => void;
 };
 
 type InlineOverflowInnerData = {
@@ -30,23 +31,28 @@ type InlineOverflowInnerData = {
   rootContentBoxWidth: number | null;
   measuredRootElement: HTMLElement | null;
   measuredContentElement: HTMLElement | null;
+  disableRangeFallback: boolean;
 };
 
-const createInitialInnerData = (): InlineOverflowInnerData => {
+const createInitialInnerData = (
+  disableRangeFallback: boolean,
+): InlineOverflowInnerData => {
   return {
     rootElement: null,
     contentElement: null,
     rootContentBoxWidth: null,
     measuredRootElement: null,
     measuredContentElement: null,
+    disableRangeFallback,
   };
 };
 
 export const createInlineOverflowStore = (
   initialOnOverflowChange?: InlineOverflowChangeHandler,
+  initialDisableRangeFallback = false,
 ): InlineOverflowStore => {
   let overflow = false;
-  const innerData = createInitialInnerData();
+  const innerData = createInitialInnerData(initialDisableRangeFallback);
   let onOverflowChange = initialOnOverflowChange;
   let unobserveRootResize: (() => void) | null = null;
   let unobserveContentResize: (() => void) | null = null;
@@ -85,6 +91,7 @@ export const createInlineOverflowStore = (
       root: rootElement,
       content: contentElement,
       rootContentBoxWidth: innerData.rootContentBoxWidth,
+      disableRangeFallback: innerData.disableRangeFallback,
     });
     const elementsChanged =
       innerData.measuredRootElement !== rootElement ||
@@ -189,6 +196,14 @@ export const createInlineOverflowStore = (
     },
     setOnOverflowChange: (handler) => {
       onOverflowChange = handler;
+    },
+    setDisableRangeFallback: (disabled) => {
+      if (innerData.disableRangeFallback === disabled) {
+        return;
+      }
+
+      innerData.disableRangeFallback = disabled;
+      scheduleMeasure();
     },
   };
 };
