@@ -36,7 +36,7 @@ const AccessoryExample = (props: AccessoryExampleProps) => {
       </div>
 
       <div
-        className={`${widthClassName} max-w-full rounded-md border bg-background p-3`}
+        className={`${widthClassName} max-w-full min-w-0 rounded-md border bg-background p-3`}
       >
         <TooltipProvider>
           <Tooltip
@@ -44,7 +44,7 @@ const AccessoryExample = (props: AccessoryExampleProps) => {
             onOpenChange={handleTooltipOpenChange}
           >
             <InlineOverflow
-              className="inline-flex max-w-full min-w-0 items-center align-bottom data-overflow:text-primary"
+              className="flex w-full min-w-0 items-center data-overflow:text-primary"
               onOverflowChange={(nextOverflow) => {
                 setOverflow(nextOverflow);
                 if (!nextOverflow) {

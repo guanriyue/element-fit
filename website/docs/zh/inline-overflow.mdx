@@ -18,9 +18,19 @@ import { InlineOverflow } from '@guanriyue/react-fit/inline-overflow';
 
 ## 基础用法
 
-Root 不提供默认布局样式。调用方需要让 Root 形成可测量的盒子，并决定 Content 如何获得和收缩宽度。下面的示例使用 `inline-flex` 和 `min-w-0` 建立单行省略布局。
+Root 不提供默认布局样式。调用方需要让 Root 形成可测量的盒子，并决定 Content 如何获得和收缩宽度。下面的示例使用 `flex w-full min-w-0` 建立跟随父容器宽度收缩的单行省略布局。
 
 ## 宽容器
+
+在 ellipsis 的临界位置，浏览器可能已经绘制省略号，但 JavaScript 读取到的 `clientWidth` 和 `scrollWidth` 仍然相等。此时使用 `scrollWidth > clientWidth` 的普通判断会得到“未溢出”，从而漏掉已经出现的省略。这个浏览器平台问题可以参考 CSSWG 的 [issue #4123](https://github.com/w3c/csswg-drafts/issues/4123)。
+
+组件会对这类边界情况做额外校正。下面两组内容、布局和宽度完全一致，用于对比“启用边界校正”和“关闭边界校正”时的判定差异。这个修正只面向文本类内容；如果 Content 内包含 `inline-block`、`inline-flex` 等非文本节点，修正逻辑不会启用。
+
+> 静态截图：下图用于展示边界校正可能带来的判定差异，不是可交互 demo。这个现象只在极限边界情况下才可能复现，通常需要多次调整文本或宽度。下面的 preview 示例可以用于本地继续观察。
+
+![启用边界校正和关闭边界校正时的 ellipsis 判定对比](/inline-overflow-range-diff.png)
+
+下面是可交互 demo：
 
 ```tsx file="<root>/src/demos/inline-overflow/wide.tsx" preview
 
@@ -70,6 +80,14 @@ Root、Content 和 Accessory 都支持 `asChild`。组件会把 ref、状态属�
 
 ## 多个 Inline 节点
 
+下面示例包含 `inline-block` 和 `inline-flex` 节点，因此边界校正不会启用。两组内容、布局和宽度保持一致，用于观察非纯文本内容在“启用边界校正”和“关闭边界校正”时通常会得到相同判定。
+
+> 静态截图：下图用于展示多个 inline 节点场景下的对比效果，不是可交互 demo。下面的 preview 示例可以用于本地继续观察。
+
+![多个 inline 节点在启用边界校正和关闭边界校正时的对比](/inline-overflow-inline-nodes-diff.png)
+
+下面是可交互 demo：
+
 ```tsx file="<root>/src/demos/inline-overflow/inline-nodes.tsx" preview
 
 ```
@@ -83,13 +101,16 @@ Content 内可以包含多个 inline / inline-block / inline-flex 节点。组�
 - flex 布局通常需要为 Content 设置 `min-width: 0`。
 - grid 布局通常需要使用 `minmax(0, 1fr)`，或者为 Content 设置 `min-width: 0`。
 - Root padding 会参与测量；组件比较 Content 的 `scrollWidth` 与 Root 扣除 inline padding 后的 content box width。
+- 不要在 Content 上增加 `padding`、`margin` 等会改变布局计算的样式。Content 是唯一测量节点，这类样式会让“内容宽度”和“目标可用宽度”的关系变得不稳定，破坏组件内部的计算模型。
 
 ## 观测边界
 
 组件使用 ResizeObserver 监听 Root 和 Content 的尺寸变化，并使用 MutationObserver 监听 Content subtree 中的文本和子节点变化。MutationObserver 不观察 attributes；仅修改 class、style、继承样式、已加载字体或伪元素内容时，如果 Root 和 Content 的盒子尺寸都没有变化，组件不保证重新测量。
 
+浏览器目前没有稳定可用的 Computed Style Observer。`font-size`、`font-family`、`letter-spacing` 等 computed style 的变化本身无法被直接观测，因此由这些样式变化导致的 overflow 变化也不保证被捕获。兄弟选择器、父子选择器、主题 class、响应式 class 等间接改变 Content 文本布局的写法都需要谨慎使用；只有等类似 [ComputedStyleObserver](https://github.com/w3c/csswg-drafts/issues/8982) 的能力成熟后，这类变化才可能被更稳定地观测。
+
 首次客户端测量前，内部 overflow 状态为 `false`，`data-overflow` 不存在，Accessory 不渲染。当前不提供 `defaultOverflow`、受控 `overflow` 或手动 remeasure API。
 
 这里的“反事实测量”指测量一个当前 DOM 布局里并不存在的假设状态。例如：Accessory 还没有渲染，但调用方想提前知道“如果 Accessory 显示并占掉一部分宽度，Content 会不会溢出”。这需要临时构造或模拟另一种布局再测量。`InlineOverflow` 不处理这种模式，它只测量当前 Root 与 Content 形成的真实布局，再根据结果决定 Accessory 是否渲染。
 
-在极限临界范围内，浏览器可能已经绘制 ellipsis，但 JavaScript 读取到的 `scrollWidth` 和 `clientWidth` 仍相同。组件使用固定 `0.5px` EPSILON 减少比较抖动，但无法恢复浏览器没有暴露的亚像素 scroll width。
+在极限临界范围内，浏览器可能已经绘制 ellipsis，但 JavaScript 读取到的 `clientWidth` 和 `scrollWidth` 仍相同。组件使用固定 `0.5px` EPSILON 减少比较抖动，并对文本类内容尝试额外的边界校正；但如果 Content 内包含 `inline-block`、`inline-flex` 等其他类型节点，修正逻辑不会启用。

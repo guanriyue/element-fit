@@ -34,7 +34,7 @@ const InlineOverflowHoverDemo = () => {
           </div>
         </div>
 
-        <div className="w-75 max-w-full rounded-md border bg-background p-3">
+        <div className="w-75 max-w-full min-w-0 rounded-md border bg-background p-3">
           <TooltipProvider>
             <Tooltip
               open={overflow && tooltipOpen}
@@ -42,7 +42,7 @@ const InlineOverflowHoverDemo = () => {
             >
               <TooltipTrigger asChild>
                 <InlineOverflow
-                  className="inline-flex max-w-full min-w-0 align-bottom data-overflow:text-primary"
+                  className="flex w-full min-w-0 data-overflow:text-primary"
                   onOverflowChange={(nextOverflow) => {
                     setOverflow(nextOverflow);
                     if (!nextOverflow) {

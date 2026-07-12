@@ -35,14 +35,14 @@ const InlineOverflowAccessorySeparateRowDemo = () => {
           </div>
         </div>
 
-        <div className="w-[340px] max-w-full rounded-md border bg-background p-3">
+        <div className="w-[340px] max-w-full min-w-0 rounded-md border bg-background p-3">
           <TooltipProvider>
             <Tooltip
               open={overflow && tooltipOpen}
               onOpenChange={handleTooltipOpenChange}
             >
               <InlineOverflow
-                className="grid max-w-full min-w-0 grid-cols-[minmax(0,1fr)] gap-2 data-overflow:text-primary"
+                className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)] gap-2 data-overflow:text-primary"
                 onOverflowChange={(nextOverflow) => {
                   setOverflow(nextOverflow);
                   if (!nextOverflow) {

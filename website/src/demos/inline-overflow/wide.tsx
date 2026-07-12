@@ -1,6 +1,18 @@
 import { InlineOverflow } from '@guanriyue/react-fit/inline-overflow';
-import { type ChangeEvent, useState } from 'react';
+import {
+  type ChangeEvent,
+  type ComponentProps,
+  type ComponentType,
+  useState,
+} from 'react';
 import { DemoBox } from '@/components/custom/demo-box';
+
+type InlineOverflowDebugProps = ComponentProps<typeof InlineOverflow> & {
+  __debugDisableRangeFallback?: boolean;
+};
+
+const InlineOverflowDebug = InlineOverflow as ComponentType<InlineOverflowDebugProps> &
+  typeof InlineOverflow;
 
 const defaultText =
   'element-fit/packages/react-fit/src/InlineOverflow/very-long-file-name-for-observation.tsx';
@@ -8,6 +20,7 @@ const defaultText =
 const InlineOverflowWideDemo = () => {
   const [text, setText] = useState(defaultText);
   const [overflow, setOverflow] = useState(false);
+  const [overflowWithoutFallback, setOverflowWithoutFallback] = useState(false);
   const handleTextChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
     setText(event.target.value);
   };
@@ -19,22 +32,49 @@ const InlineOverflowWideDemo = () => {
           <div className="text-sm font-medium text-muted-foreground">
             宽容器
           </div>
-          <div className="rounded-md border px-2 py-1 text-xs">
-            {overflow ? 'overflow' : 'fit'}
+          <div className="flex items-center gap-2 text-xs">
+            <div className="rounded-md border px-2 py-1">
+              corrected: {overflow ? 'overflow' : 'fit'}
+            </div>
+            <div className="rounded-md border px-2 py-1">
+              raw: {overflowWithoutFallback ? 'overflow' : 'fit'}
+            </div>
           </div>
         </div>
 
-        <div className="rounded-md border bg-background p-3">
-          <InlineOverflow
-            className="inline-flex max-w-full min-w-0 align-bottom data-overflow:text-primary"
-            onOverflowChange={(nextOverflow) => {
-              setOverflow(nextOverflow);
-            }}
-          >
-            <InlineOverflow.Content className="min-w-0 flex-1">
-              {text}
-            </InlineOverflow.Content>
-          </InlineOverflow>
+        <div className="grid min-w-0 gap-3">
+          <div className="min-w-0 rounded-md border bg-background p-3">
+            <div className="mb-1 text-xs text-muted-foreground">
+              启用边界校正
+            </div>
+            <InlineOverflowDebug
+              className="flex w-full min-w-0 data-overflow:text-primary"
+              onOverflowChange={(nextOverflow) => {
+                setOverflow(nextOverflow);
+              }}
+            >
+              <InlineOverflow.Content className="min-w-0 flex-1">
+                {text}
+              </InlineOverflow.Content>
+            </InlineOverflowDebug>
+          </div>
+
+          <div className="min-w-0 rounded-md border bg-background p-3">
+            <div className="mb-1 text-xs text-muted-foreground">
+              关闭边界校正
+            </div>
+            <InlineOverflowDebug
+              __debugDisableRangeFallback
+              className="flex w-full min-w-0 data-overflow:text-primary"
+              onOverflowChange={(nextOverflow) => {
+                setOverflowWithoutFallback(nextOverflow);
+              }}
+            >
+              <InlineOverflow.Content className="min-w-0 flex-1">
+                {text}
+              </InlineOverflow.Content>
+            </InlineOverflowDebug>
+          </div>
         </div>
 
         <div className="space-y-1.5">

@@ -24,9 +24,9 @@ const InlineOverflowNarrowDemo = () => {
           </div>
         </div>
 
-        <div className="w-65 max-w-full rounded-md border bg-background p-3">
+        <div className="w-65 max-w-full min-w-0 rounded-md border bg-background p-3">
           <InlineOverflow
-            className="inline-flex max-w-full min-w-0 align-bottom data-overflow:text-primary"
+            className="flex w-full min-w-0 data-overflow:text-primary"
             onOverflowChange={(nextOverflow) => {
               setOverflow(nextOverflow);
             }}
