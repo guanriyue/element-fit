@@ -34,6 +34,10 @@
     "./inline-overflow": {
       "types": "./src/InlineOverflow/index.ts",
       "import": "./src/InlineOverflow/index.ts"
+    },
+    "./line-clamp": {
+      "types": "./src/LineClamp/index.ts",
+      "import": "./src/LineClamp/index.ts"
     }
   },
   "scripts": {
@@ -81,6 +85,10 @@
       "./inline-overflow": {
         "types": "./dist/InlineOverflow/index.d.ts",
         "import": "./dist/InlineOverflow/index.js"
+      },
+      "./line-clamp": {
+        "types": "./dist/LineClamp/index.d.ts",
+        "import": "./dist/LineClamp/index.js"
       }
     }
   },

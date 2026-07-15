@@ -75,6 +75,7 @@ export default defineConfig({
         'FitGrid/index': resolve(root, 'src/FitGrid/index.ts'),
         'FitSwitch/index': resolve(root, 'src/FitSwitch/index.ts'),
         'InlineOverflow/index': resolve(root, 'src/InlineOverflow/index.ts'),
+        "LineClamp/index": resolve(root, 'src/LineClamp/index.ts')
       },
       formats: ['es'],
       fileName: (_, entryName) => `${entryName}.js`,
