@@ -1,4 +1,5 @@
 import { measureLineRects } from './measureLineRects';
+import { markLineClampMeasurementNode } from './measurementNode';
 import { createLineClampStore, type LineClampMeasureParams, type LineClampStore } from './store';
 
 const applyMeasureRootStyle = (measureRoot: HTMLDivElement, width: number) => {
@@ -38,6 +39,9 @@ const measureCloneOverflow = (params: LineClampMeasureParams): boolean => {
 
   // Clone only content nodes. Including Spacer or Suffix would make the
   // measurement depend on the currently rendered collapsed/expanded UI.
+  // Mark the entire temporary subtree before attaching it so Root's mutation
+  // observer can ignore both its insertion and removal records.
+  markLineClampMeasurementNode(measureRoot);
   applyMeasureRootStyle(measureRoot, rootContentBoxWidth);
   measureRoot.setAttribute('aria-hidden', 'true');
   measureRoot.setAttribute('inert', '');

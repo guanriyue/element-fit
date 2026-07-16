@@ -127,8 +127,9 @@ Spacer + Suffix 是建立在这些浏览器布局行为之上的实现方案，�
 可能占据或推开多行正文。复杂 inline box、bidi、ruby、强制换行和不同浏览器的 Range rect 也可能产生
 边界差异。
 
-当前没有 MutationObserver。仅改变正文节点不保证自动重新测量；Root content box width 或 `lines`
-发生变化时会重新测量。
+组件使用 MutationObserver 监听 Root subtree 中的子节点和文本变化，并重新调度测量。`clone` 策略创建和
+移除临时测量节点时产生的 mutation 会被过滤，不会反复触发自身。MutationObserver 不监听 attributes；
+仅修改 class、style、继承样式、字体或伪元素内容时，如果没有其他可观察变化，不保证重新测量。
 
 ## 参考资料
 

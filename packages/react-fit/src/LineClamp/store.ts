@@ -1,5 +1,13 @@
 import { observeElementResize } from '@guanriyue/resize-observer-hub';
 import { createDoubleRafScheduler } from '../_internal/createDoubleRafScheduler';
+import { observeElementMutation } from '../_internal/observeElementMutation';
+import { isLineClampMeasurementMutation } from './measurementNode';
+
+const LINE_CLAMP_MUTATION_OPTIONS = {
+  subtree: true,
+  childList: true,
+  characterData: true,
+} satisfies MutationObserverInit;
 
 type LineClampStoreListener = () => void;
 type LineClampOverflowChangeListener = (overflow: boolean) => void;
@@ -168,6 +176,7 @@ export const createLineClampStore = (
   let suffixElement: HTMLSpanElement | null = null;
   let rootContentBoxWidth: number | null = null;
   let unobserveRootResize: (() => void) | null = null;
+  let unobserveRootMutation: (() => void) | null = null;
   let onOverflowChange: LineClampOverflowChangeListener | undefined;
   let hasMeasuredOverflow = false;
   let measuredOverflow = false;
@@ -253,6 +262,11 @@ export const createLineClampStore = (
       unobserveRootResize = null;
     }
 
+    if (unobserveRootMutation) {
+      unobserveRootMutation();
+      unobserveRootMutation = null;
+    }
+
     rootContentBoxWidth = null;
   };
 
@@ -281,6 +295,19 @@ export const createLineClampStore = (
         scheduleMeasure();
       }
     });
+    unobserveRootMutation = observeElementMutation(
+      observedRoot,
+      (records) => {
+        const contentChanged = records.some((record) => {
+          return !isLineClampMeasurementMutation(record);
+        });
+
+        if (contentChanged) {
+          scheduleMeasure();
+        }
+      },
+      LINE_CLAMP_MUTATION_OPTIONS,
+    );
   };
 
   return {
