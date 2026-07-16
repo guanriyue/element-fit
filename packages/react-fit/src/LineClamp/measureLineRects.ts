@@ -7,7 +7,44 @@ type InlineInterval = {
 
 export type LineMeasure = {
   top: number;
+  bottom: number;
   intervals: InlineInterval[];
+};
+
+const getBlockOverlap = (
+  first: Pick<LineMeasure, 'top' | 'bottom'>,
+  second: Pick<LineMeasure, 'top' | 'bottom'>,
+): number => {
+  return Math.min(first.bottom, second.bottom)
+    - Math.max(first.top, second.top);
+};
+
+const findOverlappingLine = (
+  lines: LineMeasure[],
+  rect: DOMRect,
+): LineMeasure | undefined => {
+  let matchedLine: LineMeasure | undefined;
+  let largestOverlap = LINE_POSITION_EPSILON;
+
+  for (const line of lines) {
+    const overlap = getBlockOverlap(line, rect);
+
+    if (overlap <= largestOverlap) {
+      continue;
+    }
+
+    matchedLine = line;
+    largestOverlap = overlap;
+  }
+
+  return matchedLine;
+};
+
+const isSameVisualLine = (
+  first: LineMeasure,
+  second: LineMeasure,
+): boolean => {
+  return getBlockOverlap(first, second) > LINE_POSITION_EPSILON;
 };
 
 const measureRangeRects = (range: Range): LineMeasure[] => {
@@ -18,9 +55,7 @@ const measureRangeRects = (range: Range): LineMeasure[] => {
       continue;
     }
 
-    const currentLine = lines.find((line) => {
-      return Math.abs(line.top - rect.top) <= LINE_POSITION_EPSILON;
-    });
+    const currentLine = findOverlappingLine(lines, rect);
     const interval = {
       start: rect.left,
       end: rect.right,
@@ -29,11 +64,14 @@ const measureRangeRects = (range: Range): LineMeasure[] => {
     if (typeof currentLine === 'undefined') {
       lines.push({
         top: rect.top,
+        bottom: rect.bottom,
         intervals: [interval],
       });
       continue;
     }
 
+    currentLine.top = Math.min(currentLine.top, rect.top);
+    currentLine.bottom = Math.max(currentLine.bottom, rect.bottom);
     currentLine.intervals.push(interval);
   }
 
@@ -94,12 +132,11 @@ export const hasBrBetweenLines = (
       continue;
     }
 
-    const matchesPreviousLine = Math.abs(
-      previousLine.top - lineBefore.top,
-    ) <= LINE_POSITION_EPSILON;
-    const matchesNextLine = Math.abs(
-      nextLine.top - lineAfter.top,
-    ) <= LINE_POSITION_EPSILON;
+    const matchesPreviousLine = isSameVisualLine(
+      previousLine,
+      lineBefore,
+    );
+    const matchesNextLine = isSameVisualLine(nextLine, lineAfter);
 
     if (matchesPreviousLine && matchesNextLine) {
       return true;
