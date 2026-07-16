@@ -17,6 +17,10 @@
       {
         "text": "InlineOverflow",
         "link": "/inline-overflow"
+      },
+      {
+        "text": "LineClamp",
+        "link": "/line-clamp"
       }
     ]
   }
