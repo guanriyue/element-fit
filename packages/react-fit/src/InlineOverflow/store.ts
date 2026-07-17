@@ -1,5 +1,5 @@
 import { observeElementResize } from '@guanriyue/resize-observer-hub';
-import { createDoubleRafScheduler } from '../_internal/createDoubleRafScheduler.ts';
+import { batchedDoubleRafScheduler } from '../_internal/batchedDoubleRafScheduler.ts';
 import { observeElementMutation } from '../_internal/observeElementMutation.ts';
 import { measureInlineOverflowWithRootContentBoxWidth } from './measureInlineOverflow.ts';
 
@@ -107,7 +107,9 @@ export const createInlineOverflowStore = (
     }
   };
 
-  const scheduleMeasure = createDoubleRafScheduler(measureAndCommit);
+  const scheduleMeasure = () => {
+    batchedDoubleRafScheduler.schedule(measureAndCommit);
+  };
 
   const stopRootObserve = () => {
     if (unobserveRootResize) {

@@ -32,10 +32,10 @@ export const measureInlineOverflowWithRootContentBoxWidth = (
     return { ...EMPTY_INLINE_OVERFLOW_MEASURE };
   }
 
-  const rootWidth = root.clientWidth;
   let rootContentBoxWidth = params.rootContentBoxWidth;
 
   if (isNil(rootContentBoxWidth)) {
+    const rootWidth = root.clientWidth;
     const rootStyle = getComputedStyle(root);
     const paddingInlineStart = Number.parseFloat(rootStyle.paddingInlineStart) || 0;
     const paddingInlineEnd = Number.parseFloat(rootStyle.paddingInlineEnd) || 0;

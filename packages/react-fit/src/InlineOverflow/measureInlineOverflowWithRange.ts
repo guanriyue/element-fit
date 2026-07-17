@@ -1,3 +1,14 @@
+export const measureInlineContentWidthWithRange = (content: HTMLElement): number => {
+  if (content.childNodes.length === 0) {
+    return 0;
+  }
+
+  const range = content.ownerDocument.createRange();
+  range.selectNodeContents(content);
+
+  return range.getBoundingClientRect().width;
+};
+
 /**
  * 测量 Content 是否超出 Root 的 content box width。
  *
@@ -15,23 +26,21 @@ export const measureInlineOverflowWithRange = (params: {
 }): { overflow: boolean } => {
   const { content, rootContentBoxWidth } = params;
   const contentScrollWidth = content.scrollWidth;
+  const widthDifference = contentScrollWidth - rootContentBoxWidth;
 
-  if (contentScrollWidth > rootContentBoxWidth) {
+  if (params.disableRangeFallback === true) {
+    return { overflow: widthDifference > 0 };
+  }
+
+  if (widthDifference >= 1) {
     return { overflow: true };
   }
 
-  if (
-    contentScrollWidth < rootContentBoxWidth ||
-    params.disableRangeFallback === true ||
-    content.childNodes.length === 0
-  ) {
+  if (widthDifference <= -1 || content.childNodes.length === 0) {
     return { overflow: false };
   }
 
-  const range = content.ownerDocument.createRange();
-  range.selectNodeContents(content);
-
   return {
-    overflow: range.getBoundingClientRect().width > rootContentBoxWidth,
+    overflow: measureInlineContentWidthWithRange(content) > rootContentBoxWidth,
   };
 };
