@@ -35,10 +35,7 @@ const fitSwitchMeasuringStyle: React.CSSProperties = {
   opacity: 0,
   pointerEvents: 'none',
   inlineSize: 'max-content',
-  maxInlineSize: 'none',
-  blockSize: 'auto',
-  overflow: 'visible',
-  whiteSpace: 'nowrap',
+  maxInlineSize: 'none'
 };
 
 const useFitSwitchStore = (componentName: string): FitSwitchStore => {

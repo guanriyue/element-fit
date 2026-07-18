@@ -1,6 +1,4 @@
 import { observeElementResize } from '@guanriyue/resize-observer-hub';
-import { createRafScheduler } from '../_internal/createRafScheduler.ts';
-import { isUndefined } from '../_internal/isUndefined.ts';
 
 type FitSwitchListener = () => void;
 
@@ -20,40 +18,18 @@ export type FitSwitchStore = {
 
 const FIT_SWITCH_EPSILON = 1;
 
-const createSnapshot = (mode: FitSwitchMode): FitSwitchState => {
-  return {
-    mode,
-  };
-};
-
-const getCommonParent = (
-  collapsedElement: HTMLElement | null,
-  expandedElement: HTMLElement | null,
-): HTMLElement | null | undefined => {
-  if (collapsedElement === null || expandedElement === null) {
-    return undefined;
-  }
-
-  if (
-    collapsedElement.parentElement !== null &&
-    collapsedElement.parentElement === expandedElement.parentElement
-  ) {
-    return collapsedElement.parentElement;
-  }
-
-  return null;
-};
-
 export const createFitSwitchStore = (): FitSwitchStore => {
   let collapsedElement: HTMLElement | null = null;
   let expandedElement: HTMLElement | null = null;
   let containerElement: HTMLElement | null = null;
+  let observedExpandedElement: HTMLElement | null = null;
   let containerWidth: number | null = null;
   let expandedWidth: number | null = null;
   let unobserveContainerResize: (() => void) | null = null;
   let unobserveExpandedResize: (() => void) | null = null;
-  let warnedMissingContainer = false;
-  let snapshot = createSnapshot('collapsed');
+  let snapshot: FitSwitchState = {
+    mode: 'collapsed',
+  };
   const listeners = new Set<FitSwitchListener>();
 
   const notify = () => {
@@ -62,47 +38,38 @@ export const createFitSwitchStore = (): FitSwitchStore => {
     }
   };
 
-  const commit = (nextSnapshot: FitSwitchState) => {
-    if (snapshot.mode === nextSnapshot.mode) {
+  const setMode = (mode: FitSwitchMode) => {
+    if (snapshot.mode === mode) {
       return;
     }
 
-    snapshot = nextSnapshot;
+    snapshot = {
+      mode,
+    };
+
     notify();
   };
 
-  const syncMode = () => {
+  const commitMeasuredMode = () => {
     if (containerWidth === null || expandedWidth === null) {
-      commit(createSnapshot('collapsed'));
+      setMode('collapsed');
       return;
     }
 
-    commit(
-      createSnapshot(
-        expandedWidth <= containerWidth + FIT_SWITCH_EPSILON ? 'expanded' : 'collapsed',
-      ),
-    );
+    setMode(expandedWidth <= containerWidth + FIT_SWITCH_EPSILON ? 'expanded' : 'collapsed');
   };
 
-  const setContainerWidth = (width: number) => {
-    if (containerWidth === width) {
-      return;
-    }
-
+  const updateContainerWidth = (width: number) => {
     containerWidth = width;
-    scheduleModeSync();
+    commitMeasuredMode();
   };
 
-  const setExpandedWidth = (width: number) => {
-    if (expandedWidth === width) {
-      return;
-    }
-
+  const updateExpandedWidth = (width: number) => {
     expandedWidth = width;
-    scheduleModeSync();
+    commitMeasuredMode();
   };
 
-  const stopContainerObserve = () => {
+  const stopObservingContainer = () => {
     if (unobserveContainerResize) {
       unobserveContainerResize();
       unobserveContainerResize = null;
@@ -112,74 +79,75 @@ export const createFitSwitchStore = (): FitSwitchStore => {
     containerWidth = null;
   };
 
-  const stopExpandedObserve = () => {
+  const stopObservingExpanded = () => {
     if (unobserveExpandedResize) {
       unobserveExpandedResize();
       unobserveExpandedResize = null;
     }
 
+    observedExpandedElement = null;
     expandedWidth = null;
   };
 
-  const syncContainerObserve = () => {
-    const commonParent = getCommonParent(collapsedElement, expandedElement);
-
-    if (isUndefined(commonParent)) {
-      stopContainerObserve();
-      scheduleModeSync();
+  const reconcileContainerObservation = () => {
+    if (!collapsedElement || !expandedElement) {
+      stopObservingContainer();
+      commitMeasuredMode();
       return;
     }
 
-    if (commonParent === null) {
-      stopContainerObserve();
-
-      if (process.env.NODE_ENV !== 'production' && !warnedMissingContainer) {
-        warnedMissingContainer = true;
+    if (collapsedElement.parentElement !== expandedElement.parentElement) {
+      if (process.env.NODE_ENV !== 'production') {
         console.warn(
           '[react-fit] FitSwitch expected Collapsed and Expanded to share the same parentElement.',
         );
       }
 
-      scheduleModeSync();
+      stopObservingContainer();
+      commitMeasuredMode();
       return;
     }
 
-    warnedMissingContainer = false;
-
-    if (containerElement === commonParent) {
+    const nextContainer = collapsedElement.parentElement;
+    if (!nextContainer) {
+      stopObservingContainer();
+      commitMeasuredMode();
       return;
     }
 
-    stopContainerObserve();
-    containerElement = commonParent;
-    setContainerWidth(containerElement.getBoundingClientRect().width);
-    unobserveContainerResize = observeElementResize(containerElement, (entry) => {
-      setContainerWidth(entry.contentRect.width);
+    if (containerElement === nextContainer) {
+      return;
+    }
+
+    stopObservingContainer();
+    containerElement = nextContainer;
+    unobserveContainerResize = observeElementResize(nextContainer, (entry) => {
+      updateContainerWidth(entry.contentRect.width);
     });
   };
 
-  const syncExpandedObserve = () => {
-    stopExpandedObserve();
+  const reconcileExpandedObservation = () => {
+    if (observedExpandedElement === expandedElement) {
+      return;
+    }
+
+    stopObservingExpanded();
 
     if (expandedElement === null) {
-      scheduleModeSync();
+      commitMeasuredMode();
       return;
     }
 
-    setExpandedWidth(expandedElement.getBoundingClientRect().width);
+    observedExpandedElement = expandedElement;
     unobserveExpandedResize = observeElementResize(expandedElement, (entry) => {
-      setExpandedWidth(entry.contentRect.width);
+      updateExpandedWidth(entry.contentRect.width);
     });
   };
 
-  const syncLayout = () => {
-    syncExpandedObserve();
-    syncContainerObserve();
-    scheduleModeSync();
+  const reconcileObservations = () => {
+    reconcileExpandedObservation();
+    reconcileContainerObservation();
   };
-
-  const scheduleModeSync = createRafScheduler(syncMode);
-  const scheduleLayoutSync = createRafScheduler(syncLayout);
 
   return {
     getSnapshot: () => snapshot,
@@ -192,12 +160,20 @@ export const createFitSwitchStore = (): FitSwitchStore => {
     },
     setViewElement: (view, element) => {
       if (view === 'collapsed') {
+        if (collapsedElement === element) {
+          return;
+        }
+
         collapsedElement = element;
       } else {
+        if (expandedElement === element) {
+          return;
+        }
+
         expandedElement = element;
       }
 
-      scheduleLayoutSync();
+      reconcileObservations();
     },
   };
 };
