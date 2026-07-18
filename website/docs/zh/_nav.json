@@ -21,6 +21,10 @@
       {
         "text": "LineClamp",
         "link": "/line-clamp"
+      },
+      {
+        "text": "Textarea",
+        "link": "/textarea"
       }
     ]
   }

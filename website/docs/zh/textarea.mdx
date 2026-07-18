@@ -1,0 +1,95 @@
+---
+description: Textarea 可以在保留原生 textarea 用法的同时，根据内容自动调整高度。
+outline: false
+pageType: doc-wide
+---
+
+# Textarea
+
+`Textarea` 在原生 `<textarea>` 的基础上提供可选的自动高度能力。未启用 `autoSize` 时，它保持原生 textarea 的尺寸行为；启用后，组件会根据内容和可用宽度重新计算高度，并可通过行数限制保留滚动能力。
+
+## 导入
+
+```tsx
+import { Textarea } from '@guanriyue/react-fit/textarea';
+```
+
+## 基础用法
+
+下面的示例可以切换 `autoSize` 的三种主要配置，并调整 `rows`、`minRows` 和 `maxRows`。修改内容或拖动容器宽度，可以观察换行变化后的重新测量。
+
+```tsx file="<root>/src/demos/textarea/basic.tsx" preview
+
+```
+
+## 自动高度模式
+
+传入 `autoSize` 会启用不限制行数的自动高度。Textarea 会随着内容增加继续增高，不主动产生纵向滚动条。
+
+```tsx
+<Textarea autoSize />
+```
+
+需要限制伸缩范围时，向 `autoSize` 传入 `minRows` 和 `maxRows`。内容少于最低行数时保留最低高度；超过最高行数后高度不再增加，并允许内容区域纵向滚动。
+
+```tsx
+<Textarea autoSize={{ minRows: 2, maxRows: 6 }} />
+```
+
+不传 `autoSize` 或显式传入 `false` 时，组件不会接管 `height` 和 `overflowY`，`rows`、CSS 高度及浏览器原生 resize 行为照常生效。
+
+```tsx
+<Textarea rows={4} />
+```
+
+## 行数约束
+
+`rows` 在两种模式下有不同作用：
+
+- 未启用 `autoSize` 时，`rows` 是原生 textarea 的可见行数。
+- 启用 `autoSize` 且没有设置 `minRows` 时，有效的 `rows` 会作为最低行数。
+- 同时设置 `rows` 和 `minRows` 时，以 `minRows` 为准。
+- `minRows` 和 `maxRows` 只接受正整数。若有效的 `maxRows` 小于最低行数，组件会将它收敛到最低行数。
+
+`minRows` 和 `maxRows` 都没有默认值，可以只设置其中一项：
+
+```tsx
+<Textarea autoSize={{ minRows: 3 }} />
+<Textarea autoSize={{ maxRows: 8 }} />
+```
+
+## 受控与非受控
+
+`Textarea` 保留原生的 `value`、`defaultValue` 和 `onChange` 接口。受控模式下，`value` 更新会触发重新测量；非受控模式下，用户输入会触发重新测量。
+
+```tsx
+const [value, setValue] = useState('');
+
+<Textarea
+  autoSize={{ minRows: 2, maxRows: 8 }}
+  value={value}
+  onChange={(event) => {
+    setValue(event.target.value);
+  }}
+/>
+```
+
+## 重新测量
+
+启用自动高度后，组件会在以下情况重新测量：
+
+- `value`、`autoSize`、`minRows`、`maxRows` 或有效最低行数变化。
+- 用户在非受控 Textarea 中输入内容。
+- Textarea 的宽度发生变化，导致文本重新换行。
+- `class`、`cols`、`dir`、`lang`、`placeholder`、`rows`、`wrap` 等可能影响排版的属性变化。
+- 传入的 `style` 内容变化。
+
+测量通过隐藏的 textarea 复现文本排版，因此字体、行高、字间距、padding、border、`box-sizing` 和换行规则都会参与高度计算。
+
+## 样式与边界
+
+- 自动高度只接管行内 `height` 和 `overflowY`，其他原生属性、事件和样式会继续传递给 textarea。
+- 达到 `maxRows` 后，`overflowY` 会变为 `auto`；未达到上限时为 `hidden`。
+- 首次客户端测量完成前，Textarea 使用原生 `rows` 和调用方样式计算初始高度，随后再提交自动高度。
+- 组件会响应宽度变化，不会根据父容器高度推导 Textarea 高度。
+- 自动高度模式下手动拖动纵向 resize 手柄得到的高度可能在下一次测量时被覆盖。需要稳定的自动高度界面时，通常应设置 `resize: none`，或只允许横向 resize。
