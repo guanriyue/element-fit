@@ -38,6 +38,10 @@
     "./line-clamp": {
       "types": "./src/LineClamp/index.ts",
       "import": "./src/LineClamp/index.ts"
+    },
+    "./textarea": {
+      "types": "./src/Textarea/index.ts",
+      "import": "./src/Textarea/index.ts"
     }
   },
   "scripts": {
@@ -89,6 +93,10 @@
       "./line-clamp": {
         "types": "./dist/LineClamp/index.d.ts",
         "import": "./dist/LineClamp/index.js"
+      },
+      "./textarea": {
+        "types": "./dist/Textarea/index.d.ts",
+        "import": "./dist/Textarea/index.js"
       }
     }
   },
