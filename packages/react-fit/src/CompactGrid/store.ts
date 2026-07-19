@@ -1,4 +1,5 @@
 import { observeElementResize } from '@guanriyue/resize-observer-hub';
+import { createMicrotaskScheduler } from '../_internal/createMicrotaskScheduler.ts';
 import { getColumnCount } from '../_internal/getColumnCount.ts';
 import { isDef } from '../_internal/isDef.ts';
 
@@ -199,6 +200,7 @@ const createSnapshot = (
 export const createCompactGridStore = (): CompactGridStore => {
   let rootElement: HTMLElement | null = null;
   let unobserveResize: (() => void) | null = null;
+  let extra: React.ReactNode = null;
   let snapshot = createSnapshot(null, null, false, 0);
   const listeners = new Set<CompactGridListener>();
   const items = new Map<HTMLElement, CompactGridItemOptions>();
@@ -225,7 +227,7 @@ export const createCompactGridStore = (): CompactGridStore => {
     notify();
   };
 
-  const sync = (extra: React.ReactNode = snapshot.extra) => {
+  const measureAndCommit = () => {
     const activeSlot = getLastSlot(rootElement, slots);
     const columnCount = rootElement
       ? getColumnCount(getComputedStyle(rootElement).gridTemplateColumns)
@@ -234,6 +236,8 @@ export const createCompactGridStore = (): CompactGridStore => {
 
     commit(createSnapshot(extra, activeSlot, layoutCompact, columnCount));
   };
+
+  const scheduleMeasure = createMicrotaskScheduler(measureAndCommit);
 
   return {
     getSnapshot: () => snapshot,
@@ -244,8 +248,9 @@ export const createCompactGridStore = (): CompactGridStore => {
         listeners.delete(listener);
       };
     },
-    setExtra: (extra) => {
-      sync(extra);
+    setExtra: (nextExtra) => {
+      extra = nextExtra;
+      scheduleMeasure();
     },
     setRootElement: (root) => {
       if (unobserveResize) {
@@ -256,29 +261,27 @@ export const createCompactGridStore = (): CompactGridStore => {
       rootElement = root;
 
       if (rootElement) {
-        unobserveResize = observeElementResize(rootElement, () => {
-          sync();
-        });
+        unobserveResize = observeElementResize(rootElement, measureAndCommit);
       }
 
-      sync();
+      scheduleMeasure();
     },
     registerItem: (item, options) => {
       items.set(item, options);
-      sync();
+      scheduleMeasure();
 
       return () => {
         items.delete(item);
-        sync();
+        scheduleMeasure();
       };
     },
     registerSlot: (slot) => {
       slots.add(slot);
-      sync();
+      scheduleMeasure();
 
       return () => {
         slots.delete(slot);
-        sync();
+        scheduleMeasure();
       };
     },
   };
