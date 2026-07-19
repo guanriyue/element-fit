@@ -1,3 +1,5 @@
+const resolvedPromise = Promise.resolve();
+
 export const createMicrotaskScheduler = (task: () => void): (() => void) => {
   let scheduled = false;
 
@@ -6,16 +8,18 @@ export const createMicrotaskScheduler = (task: () => void): (() => void) => {
       return;
     }
 
-    if (typeof globalThis.queueMicrotask !== 'function') {
+    scheduled = true;
+
+    const flush = () => {
+      scheduled = false;
       task();
+    };
+
+    if (typeof globalThis.queueMicrotask === 'function') {
+      globalThis.queueMicrotask(flush);
       return;
     }
 
-    scheduled = true;
-
-    globalThis.queueMicrotask(() => {
-      scheduled = false;
-      task();
-    });
+    resolvedPromise.then(flush);
   };
 };
