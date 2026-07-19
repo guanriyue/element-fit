@@ -1,5 +1,5 @@
 import { observeElementResize } from '@guanriyue/resize-observer-hub';
-import { createDoubleRafScheduler } from '../_internal/createDoubleRafScheduler';
+import { createMicrotaskScheduler } from '../_internal/createMicrotaskScheduler.ts';
 import { observeElementMutation } from '../_internal/observeElementMutation';
 import { isLineClampMeasurementMutation } from './measurementNode';
 
@@ -254,7 +254,7 @@ export const createLineClampStore = (
     dispatchOverflowChange(overflow);
   };
 
-  const scheduleMeasure = createDoubleRafScheduler(measureAndCommit);
+  const scheduleMeasure = createMicrotaskScheduler(measureAndCommit);
 
   const stopRootObserve = () => {
     if (unobserveRootResize) {
