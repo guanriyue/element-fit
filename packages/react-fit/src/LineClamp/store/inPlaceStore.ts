@@ -1,4 +1,5 @@
 import { observeElementResize } from '@guanriyue/resize-observer-hub';
+import { createIgnoredMutationSubtrees } from '../../_internal/createIgnoredMutationSubtrees.ts';
 import { createMicrotaskScheduler } from '../../_internal/createMicrotaskScheduler.ts';
 import { observeElementMutation } from '../../_internal/observeElementMutation';
 import {
@@ -7,11 +8,13 @@ import {
   measureLineRects,
 } from '../measureLineRects';
 import {
+  canReuseOverflowMeasurement,
   getContentOffsets,
   getEntryContentBoxSize,
   getRootContentBoxSize,
   LINE_CLAMP_MUTATION_OPTIONS,
   type LineClampMeasureParams,
+  type OverflowMeasurement,
 } from './measurement';
 import { createLineClampStoreState } from './state';
 import type { LineClampStore } from './types';
@@ -19,6 +22,8 @@ import type { LineClampStore } from './types';
 type InPlaceMeasureParams = LineClampMeasureParams & {
   hasFloatedSuffix: boolean;
 };
+
+const ignoredMutationSubtrees = createIgnoredMutationSubtrees();
 
 const measureInPlaceOverflow = (params: InPlaceMeasureParams): boolean => {
   const {
@@ -81,8 +86,13 @@ export const createLineClampInPlaceStore = (
   let spacerElement: HTMLSpanElement | null = null;
   let suffixElement: HTMLSpanElement | null = null;
   let rootContentBoxWidth: number | undefined;
+  let lastMeasurement: OverflowMeasurement | undefined;
   let unobserveRootResize: (() => void) | undefined;
   let unobserveRootMutation: (() => void) | undefined;
+
+  const invalidateMeasurement = () => {
+    lastMeasurement = undefined;
+  };
 
   const getMeasureParams = (): InPlaceMeasureParams | undefined => {
     if (rootElement === null || typeof rootContentBoxWidth === 'undefined') {
@@ -117,12 +127,35 @@ export const createLineClampInPlaceStore = (
       return;
     }
 
-    storeState.commitOverflow(measureInPlaceOverflow(params));
+    if (canReuseOverflowMeasurement(lastMeasurement, params.rootContentBoxWidth)) {
+      return;
+    }
+
+    const overflow = measureInPlaceOverflow(params);
+
+    lastMeasurement = {
+      width: params.rootContentBoxWidth,
+      overflow,
+    };
+    storeState.commitOverflow(overflow);
   };
 
   const scheduleMeasure = createMicrotaskScheduler(measureAndCommit);
 
+  const scheduleMeasureIfNeeded = () => {
+    if (
+      typeof rootContentBoxWidth !== 'undefined' &&
+      canReuseOverflowMeasurement(lastMeasurement, rootContentBoxWidth)
+    ) {
+      return;
+    }
+
+    scheduleMeasure();
+  };
+
   const stopRootObserve = () => {
+    invalidateMeasurement();
+
     if (unobserveRootResize) {
       unobserveRootResize();
       unobserveRootResize = undefined;
@@ -151,12 +184,19 @@ export const createLineClampInPlaceStore = (
       storeState.commit({ contentHeight: size.height });
 
       if (widthChanged) {
-        scheduleMeasure();
+        scheduleMeasureIfNeeded();
       }
     });
     unobserveRootMutation = observeElementMutation(
       observedRoot,
-      scheduleMeasure,
+      (records) => {
+        if (!ignoredMutationSubtrees.hasRelevantMutation(records)) {
+          return;
+        }
+
+        invalidateMeasurement();
+        scheduleMeasure();
+      },
       LINE_CLAMP_MUTATION_OPTIONS,
     );
   };
@@ -170,6 +210,7 @@ export const createLineClampInPlaceStore = (
       }
 
       lines = nextLines;
+      invalidateMeasurement();
 
       if (typeof nextLines === 'undefined') {
         storeState.commitOverflow(false);
@@ -205,7 +246,10 @@ export const createLineClampInPlaceStore = (
       }
 
       spacerElement = element;
-      scheduleMeasure();
+
+      if (element) {
+        ignoredMutationSubtrees.mark(element);
+      }
     },
     setSuffixElement: (element) => {
       if (suffixElement === element) {
@@ -213,7 +257,10 @@ export const createLineClampInPlaceStore = (
       }
 
       suffixElement = element;
-      scheduleMeasure();
+
+      if (element) {
+        ignoredMutationSubtrees.mark(element);
+      }
     },
   };
 };
