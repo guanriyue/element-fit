@@ -1,6 +1,10 @@
 import { observeElementResize } from '@guanriyue/resize-observer-hub';
-import { batchedDoubleRafScheduler } from '../_internal/batchedDoubleRafScheduler.ts';
+import {
+  getElementViewportProximity,
+  type ViewportProximity,
+} from '../_internal/getElementViewportProximity.ts';
 import { observeElementMutation } from '../_internal/observeElementMutation.ts';
+import { viewportPriorityTaskScheduler } from '../_internal/viewportPriorityTaskScheduler.ts';
 import { measureInlineOverflowWithRootContentBoxWidth } from './measureInlineOverflow.ts';
 
 type InlineOverflowStoreListener = () => void;
@@ -10,6 +14,8 @@ const INLINE_OVERFLOW_CONTENT_MUTATION_OPTIONS = {
   childList: true,
   characterData: true,
 } satisfies MutationObserverInit;
+
+const INLINE_OVERFLOW_VIEWPORT_MARGIN_RATIO = 0.5;
 
 /**
  * 接收最新派生 overflow 状态的回调。
@@ -107,11 +113,33 @@ export const createInlineOverflowStore = (
     }
   };
 
-  const scheduleMeasure = () => {
-    batchedDoubleRafScheduler.schedule(measureAndCommit);
+  const getMeasureViewportProximity = (): ViewportProximity => {
+    const { rootElement } = innerData;
+
+    if (rootElement === null) {
+      return 'near';
+    }
+
+    return getElementViewportProximity(rootElement, {
+      verticalMargin: window.innerHeight * INLINE_OVERFLOW_VIEWPORT_MARGIN_RATIO,
+      horizontalMargin: window.innerWidth * INLINE_OVERFLOW_VIEWPORT_MARGIN_RATIO,
+    });
+  };
+
+  const scheduleMeasure = (proximity?: ViewportProximity) => {
+    viewportPriorityTaskScheduler.schedule(
+      measureAndCommit,
+      proximity || getMeasureViewportProximity(),
+    );
+  };
+
+  const cancelMeasure = () => {
+    viewportPriorityTaskScheduler.cancel(measureAndCommit);
   };
 
   const stopRootObserve = () => {
+    cancelMeasure();
+
     if (unobserveRootResize) {
       unobserveRootResize();
       unobserveRootResize = null;
@@ -121,6 +149,8 @@ export const createInlineOverflowStore = (
   };
 
   const stopContentObserve = () => {
+    cancelMeasure();
+
     if (unobserveContentResize) {
       unobserveContentResize();
       unobserveContentResize = null;
@@ -140,13 +170,10 @@ export const createInlineOverflowStore = (
     }
 
     unobserveRootResize = observeElementResize(rootElement, (entry) => {
-      if (entry.target !== innerData.rootElement) {
-        return;
-      }
-
+      const proximity = getMeasureViewportProximity();
       innerData.rootContentBoxWidth =
         entry.contentBoxSize[0]?.inlineSize ?? entry.contentRect.width;
-      scheduleMeasure();
+      scheduleMeasure(proximity);
     });
   };
 
@@ -157,10 +184,14 @@ export const createInlineOverflowStore = (
       return;
     }
 
-    unobserveContentResize = observeElementResize(contentElement, scheduleMeasure);
+    unobserveContentResize = observeElementResize(contentElement, () => {
+      scheduleMeasure();
+    });
     unobserveContentMutation = observeElementMutation(
       contentElement,
-      scheduleMeasure,
+      () => {
+        scheduleMeasure();
+      },
       INLINE_OVERFLOW_CONTENT_MUTATION_OPTIONS,
     );
   };
