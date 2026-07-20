@@ -1,4 +1,5 @@
 import { observeElementResize } from '@guanriyue/resize-observer-hub';
+import { createIgnoredMutationSubtrees } from '../../_internal/createIgnoredMutationSubtrees.ts';
 import {
   getElementViewportProximity,
   type ViewportProximity,
@@ -12,20 +13,19 @@ import { observeElementMutation } from '../../_internal/observeElementMutation';
 import { viewportPriorityTaskScheduler } from '../../_internal/viewportPriorityTaskScheduler.ts';
 import { measureLineRects } from '../measureLineRects';
 import {
-  isLineClampMeasurementMutation,
-  markLineClampMeasurementNode,
-} from '../measurementNode';
-import {
+  canReuseOverflowMeasurement,
   getContentOffsets,
   getEntryContentBoxSize,
   getRootContentBoxSize,
   LINE_CLAMP_MUTATION_OPTIONS,
   type LineClampMeasureParams,
+  type OverflowMeasurement,
 } from './measurement';
 import { createLineClampStoreState } from './state';
 import type { LineClampStore } from './types';
 
 const LINE_CLAMP_VIEWPORT_MARGIN_RATIO = 0.5;
+const ignoredMutationSubtrees = createIgnoredMutationSubtrees();
 
 const applyMeasureRootStyle = (measureRoot: HTMLDivElement, width: number) => {
   measureRoot.style.position = 'fixed';
@@ -74,7 +74,7 @@ const createCloneLayoutTaskPlan = (
 
           // Clone only content nodes. Including Spacer or Suffix would make
           // the measurement depend on the currently rendered UI.
-          markLineClampMeasurementNode(nextMeasureRoot);
+          ignoredMutationSubtrees.mark(nextMeasureRoot);
           applyMeasureRootStyle(nextMeasureRoot, rootContentBoxWidth);
           nextMeasureRoot.setAttribute('aria-hidden', 'true');
           nextMeasureRoot.setAttribute('inert', '');
@@ -125,8 +125,17 @@ export const createLineClampCloneStore = (
   let spacerElement: HTMLSpanElement | null = null;
   let suffixElement: HTMLSpanElement | null = null;
   let rootContentBoxWidth: number | undefined;
+  let lastMeasurement: OverflowMeasurement | undefined;
   let unobserveRootResize: (() => void) | undefined;
   let unobserveRootMutation: (() => void) | undefined;
+
+  const canReuseMeasurement = (width: number): boolean => {
+    return canReuseOverflowMeasurement(lastMeasurement, width);
+  };
+
+  const invalidateMeasurement = () => {
+    lastMeasurement = undefined;
+  };
 
   const getMeasureParams = (): LineClampMeasureParams | undefined => {
     if (rootElement === null || typeof rootContentBoxWidth === 'undefined') {
@@ -167,7 +176,13 @@ export const createLineClampCloneStore = (
       return undefined;
     }
 
-    return createCloneLayoutTaskPlan(params, storeState.commitOverflow);
+    return createCloneLayoutTaskPlan(params, (overflow) => {
+      lastMeasurement = {
+        width: params.rootContentBoxWidth,
+        overflow,
+      };
+      storeState.commitOverflow(overflow);
+    });
   };
 
   const enqueueLayoutMeasure = () => {
@@ -199,6 +214,7 @@ export const createLineClampCloneStore = (
 
   const stopRootObserve = () => {
     cancelMeasure();
+    invalidateMeasurement();
 
     if (unobserveRootResize) {
       unobserveRootResize();
@@ -223,25 +239,30 @@ export const createLineClampCloneStore = (
     unobserveRootResize = observeElementResize(observedRoot, (entry) => {
       const size = getEntryContentBoxSize(entry);
       const widthChanged = rootContentBoxWidth !== size.width;
-      const proximity = widthChanged ? getMeasureViewportProximity() : undefined;
+      const reuseMeasurement = widthChanged && canReuseMeasurement(size.width);
+      const proximity =
+        widthChanged && !reuseMeasurement ? getMeasureViewportProximity() : undefined;
 
       rootContentBoxWidth = size.width;
       storeState.commit({ contentHeight: size.height });
 
       if (widthChanged) {
-        scheduleMeasure(proximity);
+        if (reuseMeasurement) {
+          cancelMeasure();
+        } else {
+          scheduleMeasure(proximity);
+        }
       }
     });
     unobserveRootMutation = observeElementMutation(
       observedRoot,
       (records) => {
-        const contentChanged = records.some((record) => {
-          return !isLineClampMeasurementMutation(record);
-        });
-
-        if (contentChanged) {
-          scheduleMeasure();
+        if (!ignoredMutationSubtrees.hasRelevantMutation(records)) {
+          return;
         }
+
+        invalidateMeasurement();
+        scheduleMeasure();
       },
       LINE_CLAMP_MUTATION_OPTIONS,
     );
@@ -256,6 +277,7 @@ export const createLineClampCloneStore = (
       }
 
       lines = nextLines;
+      invalidateMeasurement();
 
       if (typeof nextLines === 'undefined') {
         cancelMeasure();
@@ -293,7 +315,10 @@ export const createLineClampCloneStore = (
       }
 
       spacerElement = element;
-      scheduleMeasure();
+
+      if (element) {
+        ignoredMutationSubtrees.mark(element);
+      }
     },
     setSuffixElement: (element) => {
       if (suffixElement === element) {
@@ -301,7 +326,10 @@ export const createLineClampCloneStore = (
       }
 
       suffixElement = element;
-      scheduleMeasure();
+
+      if (element) {
+        ignoredMutationSubtrees.mark(element);
+      }
     },
   };
 };

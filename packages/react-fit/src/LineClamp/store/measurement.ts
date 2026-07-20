@@ -22,6 +22,24 @@ export type ContentOffsets = {
   end: number;
 };
 
+export type OverflowMeasurement = {
+  width: number;
+  overflow: boolean;
+};
+
+export const canReuseOverflowMeasurement = (
+  measurement: OverflowMeasurement | undefined,
+  width: number,
+): boolean => {
+  if (!measurement) {
+    return false;
+  }
+
+  // For unchanged content and lines, overflow remains true as width gets
+  // smaller, while a fitting result remains false as width gets larger.
+  return measurement.overflow ? width <= measurement.width : width >= measurement.width;
+};
+
 export const getContentOffsets = (
   root: HTMLSpanElement,
   spacer: HTMLSpanElement | null,
