@@ -1,9 +1,9 @@
 import { useComposedRefs } from '@radix-ui/react-compose-refs';
 import { forwardRef, useLayoutEffect, useState, useSyncExternalStore } from 'react';
 import { isPositiveInteger } from '../_internal/isPositiveInteger';
-import { createLineClampCloneStore } from './cloneStore';
-import { createLineClampInPlaceStore } from './inPlaceStore';
-import type { LineClampStore } from './store';
+import { createLineClampCloneStore } from './store/cloneStore';
+import { createLineClampInPlaceStore } from './store/inPlaceStore';
+import type { LineClampStore } from './store/types';
 
 const LINE_CLAMP_STYLE: React.CSSProperties = {
   display: 'block',
