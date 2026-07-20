@@ -1,7 +1,11 @@
 import { observeElementResize } from '@guanriyue/resize-observer-hub';
 import { createIgnoredMutationSubtrees } from '../../_internal/createIgnoredMutationSubtrees.ts';
-import { createMicrotaskScheduler } from '../../_internal/createMicrotaskScheduler.ts';
+import {
+  getElementViewportProximity,
+  type ViewportProximity,
+} from '../../_internal/getElementViewportProximity.ts';
 import { observeElementMutation } from '../../_internal/observeElementMutation';
+import { viewportPriorityTaskScheduler } from '../../_internal/viewportPriorityTaskScheduler.ts';
 import {
   getLineInlineWidth,
   hasBrBetweenLines,
@@ -23,6 +27,7 @@ type InPlaceMeasureParams = LineClampMeasureParams & {
   hasFloatedSuffix: boolean;
 };
 
+const LINE_CLAMP_VIEWPORT_MARGIN_RATIO = 0.5;
 const ignoredMutationSubtrees = createIgnoredMutationSubtrees();
 
 const measureInPlaceOverflow = (params: InPlaceMeasureParams): boolean => {
@@ -140,20 +145,29 @@ export const createLineClampInPlaceStore = (
     storeState.commitOverflow(overflow);
   };
 
-  const scheduleMeasure = createMicrotaskScheduler(measureAndCommit);
-
-  const scheduleMeasureIfNeeded = () => {
-    if (
-      typeof rootContentBoxWidth !== 'undefined' &&
-      canReuseOverflowMeasurement(lastMeasurement, rootContentBoxWidth)
-    ) {
-      return;
+  const getMeasureViewportProximity = (): ViewportProximity => {
+    if (!rootElement) {
+      return 'near';
     }
 
-    scheduleMeasure();
+    return getElementViewportProximity(rootElement, {
+      verticalMargin: window.innerHeight * LINE_CLAMP_VIEWPORT_MARGIN_RATIO,
+    });
+  };
+
+  const scheduleMeasure = (proximity?: ViewportProximity) => {
+    viewportPriorityTaskScheduler.schedule(
+      measureAndCommit,
+      proximity || getMeasureViewportProximity(),
+    );
+  };
+
+  const cancelMeasure = () => {
+    viewportPriorityTaskScheduler.cancel(measureAndCommit);
   };
 
   const stopRootObserve = () => {
+    cancelMeasure();
     invalidateMeasurement();
 
     if (unobserveRootResize) {
@@ -179,12 +193,20 @@ export const createLineClampInPlaceStore = (
     unobserveRootResize = observeElementResize(observedRoot, (entry) => {
       const size = getEntryContentBoxSize(entry);
       const widthChanged = rootContentBoxWidth !== size.width;
+      const reuseMeasurement =
+        widthChanged && canReuseOverflowMeasurement(lastMeasurement, size.width);
+      const proximity =
+        widthChanged && !reuseMeasurement ? getMeasureViewportProximity() : undefined;
 
       rootContentBoxWidth = size.width;
       storeState.commit({ contentHeight: size.height });
 
       if (widthChanged) {
-        scheduleMeasureIfNeeded();
+        if (reuseMeasurement) {
+          cancelMeasure();
+        } else {
+          scheduleMeasure(proximity);
+        }
       }
     });
     unobserveRootMutation = observeElementMutation(
@@ -213,6 +235,7 @@ export const createLineClampInPlaceStore = (
       invalidateMeasurement();
 
       if (typeof nextLines === 'undefined') {
+        cancelMeasure();
         storeState.commitOverflow(false);
         return;
       }
@@ -234,11 +257,12 @@ export const createLineClampInPlaceStore = (
       }
 
       const size = getRootContentBoxSize(element);
+      const proximity = getMeasureViewportProximity();
 
       rootContentBoxWidth = size.width;
       storeState.commit({ contentHeight: size.height });
       observeRoot();
-      scheduleMeasure();
+      scheduleMeasure(proximity);
     },
     setSpacerElement: (element) => {
       if (spacerElement === element) {
