@@ -84,11 +84,15 @@ Root、Content 和 Accessory 都支持 `asChild`。组件会将 ref、状态属�
 </InlineOverflow>
 ```
 
+`asChild` 遵循 Radix Slot 的属性合并顺序，child 自身的同名 inline style 具有最终优先级。组件不会再次
+强制覆盖这些样式；如果 child 修改 `white-space`、`overflow` 或 `text-overflow`，开发者需要自行保证
+单行省略和 overflow 测量仍符合预期。
+
 ## Styles And Layout
 
-组件只内置与行为直接相关的样式：
+组件只默认应用与行为直接相关的样式：
 
-- Content 强制使用 `white-space: nowrap`、`overflow: hidden` 和 `text-overflow: ellipsis`。
+- Content 使用 `white-space: nowrap`、`overflow: hidden` 和 `text-overflow: ellipsis`。
 - Root 不提供默认样式。
 
 调用方需要让 Root 形成可测量的盒子并提供实际宽度约束，同时决定 Content 如何获得和收缩宽度。
@@ -98,20 +102,46 @@ Root、Content 和 Accessory 都支持 `asChild`。组件会将 ref、状态属�
 `minmax(0, 1fr)`，或者同样为 Content 设置 `min-width: 0`。
 
 Root padding 会参与测量。组件比较 Content 的 `scrollWidth` 与 Root 扣除 inline padding 后的
-content box width。两者严格相等且 Content 非空时，组件会使用 Range width 进行高精度补充测量。
-Range 可以覆盖普通单行 flow 中的文本、元素和混合内容，但它不是任意 DOM 子树的 intrinsic width；margin、
-伪元素、定位、transform 和多行布局仍不属于可靠测量范围。
+content box width。当两者的差值落在 1px 内的临界区间且 Content 非空时，组件会使用 Range width
+进行高精度补充测量。Range 可以覆盖普通单行 flow 中的文本、元素和混合内容，但它不是任意 DOM
+子树的 intrinsic width；margin、伪元素、定位、transform 和多行布局仍不属于可靠测量范围。
 
-## Observation
+## Observation And Scheduling
 
 组件使用共享 ResizeObserver 监听 Root 和 Content 的盒子尺寸，并使用 MutationObserver 监听 Content
-subtree 中的文本和子节点变化。所有观察结果通过 double requestAnimationFrame 合并测量。
+subtree 中的文本和子节点变化。
 
-MutationObserver 不观察 attributes。仅修改 class、style、继承样式、已加载字体或伪元素内容时，如果 Root
-和 Content 的盒子尺寸都没有变化，组件不保证重新测量。当前不提供手动 remeasure API。
+InlineOverflow 使用包级的[视窗优先级测量调度](../../README.md#视窗优先级测量调度)。Root 作为优先级
+采样元素，垂直和水平方向的 near margin 均为对应视窗尺寸的一半。near 任务在 microtask 中批量执行，
+far 任务优先等待 idle batch。视窗外节点的首次 overflow 状态和 Accessory 展示可能因此延后。
+
+优先级只在实际需要调度测量时采样，不会通过 IntersectionObserver 持续跟踪。单独滚动页面不会触发
+重新测量；far 任务仍会在有限批次内继续完成。大量节点都位于 near 范围时，调度器无法消除这些节点自身的
+DOM、文本布局和 Range 测量成本。
 
 首次客户端测量前，内部 overflow 状态为 `false`，`data-overflow` 不存在，Accessory 不渲染。
-当前不提供 `defaultOverflow` 或受控 `overflow`。
+当前不提供 `defaultOverflow`、受控 `overflow` 或手动 remeasure API。
+
+## Width Cache
+
+组件缓存最近一次真实测量使用的 Root content-box width 和 overflow 结果。在 Content 和测量条件不变时，
+单行内容的 overflow 与可用宽度具有单调关系：
+
+- 已在某个宽度测得 overflow 时，宽度继续减小会复用 `true`。
+- 已在某个宽度测得不 overflow 时，宽度继续增大会复用 `false`。
+- 宽度向无法推断的方向变化时，重新读取 Content 并更新缓存。
+
+该缓存主要用于跳过 Resize 动画越过 overflow 临界点之后的重复测量。Accessory 显示或隐藏可能改变
+Content 获得的布局宽度并再次触发 ResizeObserver，但 Accessory 按组件约定不参与溢出判定，因此 Content
+resize 本身不会使缓存失效。命中缓存时，已经排队但尚未执行的测量也会被取消或在执行入口跳过。
+
+Root 或 Content 元素替换，以及 Content subtree 中的文本或子节点变化，会使缓存失效。MutationObserver
+不观察 attributes；仅修改 class、style、继承样式、字体、伪元素内容或外部样式表时，不保证缓存失效，
+即使这些变化同时引起 Content resize，也可能继续复用已有结果。
+
+缓存还依赖 overflow 随 Root 可用宽度单调变化。通过 container query、媒体查询或其他宽度相关规则改变
+Content 的文本、字体、display、white-space、writing mode 或子元素尺寸时，这一假设可能不成立。
+此类场景需要由开发者保证单调关系、重新挂载测量元素，或提供更符合业务布局规则的自定义实现。
 
 ## Boundaries
 
