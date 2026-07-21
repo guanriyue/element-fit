@@ -40,6 +40,11 @@ type InlineOverflowInnerData = {
   disableRangeFallback: boolean;
 };
 
+type InlineOverflowMeasurement = {
+  width: number;
+  overflow: boolean;
+};
+
 const createInitialInnerData = (
   disableRangeFallback: boolean,
 ): InlineOverflowInnerData => {
@@ -63,6 +68,7 @@ export const createInlineOverflowStore = (
   let unobserveRootResize: (() => void) | null = null;
   let unobserveContentResize: (() => void) | null = null;
   let unobserveContentMutation: (() => void) | null = null;
+  let lastMeasurement: InlineOverflowMeasurement | undefined;
   const listeners = new Set<InlineOverflowStoreListener>();
 
   const notify = () => {
@@ -81,22 +87,39 @@ export const createInlineOverflowStore = (
   };
 
   const resetMeasurement = () => {
+    lastMeasurement = undefined;
     innerData.measuredRootElement = null;
     innerData.measuredContentElement = null;
     commitOverflow(false);
   };
 
+  const canReuseMeasurement = (width: number | null): boolean => {
+    if (!lastMeasurement || typeof width !== 'number') {
+      return false;
+    }
+
+    // For unchanged content and measurement options, overflow remains true
+    // at narrower widths, while a fitting result remains false at wider widths.
+    return lastMeasurement.overflow
+      ? width <= lastMeasurement.width
+      : width >= lastMeasurement.width;
+  };
+
   const measureAndCommit = () => {
-    const { rootElement, contentElement } = innerData;
+    const { rootElement, contentElement, rootContentBoxWidth } = innerData;
 
     if (rootElement === null || contentElement === null) {
+      return;
+    }
+
+    if (canReuseMeasurement(rootContentBoxWidth)) {
       return;
     }
 
     const nextMeasure = measureInlineOverflowWithRootContentBoxWidth({
       root: rootElement,
       content: contentElement,
-      rootContentBoxWidth: innerData.rootContentBoxWidth,
+      rootContentBoxWidth,
       disableRangeFallback: innerData.disableRangeFallback,
     });
     const elementsChanged =
@@ -106,6 +129,16 @@ export const createInlineOverflowStore = (
 
     innerData.measuredRootElement = rootElement;
     innerData.measuredContentElement = contentElement;
+
+    if (typeof rootContentBoxWidth === 'number') {
+      lastMeasurement = {
+        width: rootContentBoxWidth,
+        overflow: nextMeasure.overflow,
+      };
+    } else {
+      lastMeasurement = undefined;
+    }
+
     commitOverflow(nextMeasure.overflow);
 
     if (elementsChanged || overflowChanged) {
@@ -127,6 +160,11 @@ export const createInlineOverflowStore = (
   };
 
   const scheduleMeasure = (proximity?: ViewportProximity) => {
+    if (canReuseMeasurement(innerData.rootContentBoxWidth)) {
+      viewportPriorityTaskScheduler.cancel(measureAndCommit);
+      return;
+    }
+
     viewportPriorityTaskScheduler.schedule(
       measureAndCommit,
       proximity || getMeasureViewportProximity(),
@@ -170,10 +208,14 @@ export const createInlineOverflowStore = (
     }
 
     unobserveRootResize = observeElementResize(rootElement, (entry) => {
-      const proximity = getMeasureViewportProximity();
-      innerData.rootContentBoxWidth =
-        entry.contentBoxSize[0]?.inlineSize ?? entry.contentRect.width;
-      scheduleMeasure(proximity);
+      const width = entry.contentBoxSize[0]?.inlineSize ?? entry.contentRect.width;
+
+      if (innerData.rootContentBoxWidth === width) {
+        return;
+      }
+
+      innerData.rootContentBoxWidth = width;
+      scheduleMeasure();
     });
   };
 
@@ -190,6 +232,7 @@ export const createInlineOverflowStore = (
     unobserveContentMutation = observeElementMutation(
       contentElement,
       () => {
+        lastMeasurement = undefined;
         scheduleMeasure();
       },
       INLINE_OVERFLOW_CONTENT_MUTATION_OPTIONS,
@@ -236,6 +279,7 @@ export const createInlineOverflowStore = (
       }
 
       innerData.disableRangeFallback = disabled;
+      lastMeasurement = undefined;
       scheduleMeasure();
     },
   };
