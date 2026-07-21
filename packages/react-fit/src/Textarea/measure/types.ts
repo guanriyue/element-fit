@@ -58,34 +58,6 @@ export type TextareaAutosizeMeasureRequest = {
    * @zh 可选的最大可见文本行数。
    */
   maxRows: number | undefined;
-
-  /**
-   * @en The callback invoked after this request has been measured.
-   *
-   * @zh 当前请求完成测量后调用的回调。
-   */
-  listener: TextareaAutosizeMeasureListener;
-
-  /**
-   * @en Whether this request was cancelled before completion.
-   *
-   * @zh 当前请求是否在完成前被取消。
-   */
-  cancelled: boolean;
-
-  /**
-   * @en Whether the measurement result has already been delivered.
-   *
-   * @zh 测量结果是否已经派发给监听器。
-   */
-  completed: boolean;
-
-  /**
-   * @en The inserted mirror job currently owned by this request.
-   *
-   * @zh 当前请求持有的、已经插入 DOM 的 mirror 测量任务。
-   */
-  job: TextareaAutosizeMeasureJob | null;
 };
 
 /**
@@ -290,11 +262,11 @@ export type TextareaAutosizeMeasureJob = {
 };
 
 /**
- * @en Coordinates phased Textarea measurements for the current page.
+ * @en Shared DOM resources used by Textarea measurement tasks.
  *
- * @zh 协调当前页面中分阶段执行的 Textarea 测量任务。
+ * @zh Textarea 测量任务共用的 DOM 资源。
  */
-export type TextareaAutosizeMeasureCoordinator = {
+export type TextareaAutosizeMeasureResources = {
   /**
    * @en The lazily created shared container holding mirror Textareas.
    *
@@ -308,25 +280,4 @@ export type TextareaAutosizeMeasureCoordinator = {
    * @zh 为当前页面保留并复用 mirror 节点的资源池。
    */
   mirrorPool: TextareaMirrorPool;
-
-  /**
-   * @en The pending requestAnimationFrame identifier, or null when idle.
-   *
-   * @zh 待执行的 requestAnimationFrame 标识；空闲时为 null。
-   */
-  frameId: number | null;
-
-  /**
-   * @en Requests waiting for source-style reads and mirror insertion.
-   *
-   * @zh 等待读取原始样式并插入 mirror 的请求集合。
-   */
-  pendingRawStyleRequests: Set<TextareaAutosizeMeasureRequest>;
-
-  /**
-   * @en Jobs whose mirrors are inserted and waiting for the next read phase.
-   *
-   * @zh mirror 已插入、正在等待下一次读取阶段的任务集合。
-   */
-  pendingMirrorSizeJobs: Set<TextareaAutosizeMeasureJob>;
 };

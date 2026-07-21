@@ -1,4 +1,4 @@
-import type { TextareaAutosizeMeasureCoordinator } from './types.ts';
+import type { TextareaAutosizeMeasureResources } from './types.ts';
 
 const TEXTAREA_MEASURE_CONTAINER_STYLE = {
   contain: 'strict',
@@ -12,11 +12,11 @@ const TEXTAREA_MEASURE_CONTAINER_STYLE = {
 } as const;
 
 export const getTextareaMeasureContainer = (
-  coordinator: TextareaAutosizeMeasureCoordinator,
+  resources: TextareaAutosizeMeasureResources,
   body: HTMLElement,
 ): HTMLDivElement => {
-  if (coordinator.container !== null) {
-    return coordinator.container;
+  if (resources.container !== null) {
+    return resources.container;
   }
 
   const container = body.ownerDocument.createElement('div');
@@ -29,7 +29,7 @@ export const getTextareaMeasureContainer = (
 
   container.setAttribute('aria-hidden', 'true');
   body.appendChild(container);
-  coordinator.container = container;
+  resources.container = container;
 
   return container;
 };

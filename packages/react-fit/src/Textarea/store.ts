@@ -1,9 +1,17 @@
 import { observeElementResize } from '@guanriyue/resize-observer-hub';
+import {
+  getElementViewportProximity,
+  type ViewportProximity,
+} from '../_internal/getElementViewportProximity.ts';
+import { getEntryContentBoxWidth } from '../_internal/getEntryContentBoxWidth.ts';
 import { observeElementMutation } from '../_internal/observeElementMutation.ts';
+import { viewportPriorityTaskScheduler } from '../_internal/viewportPriorityTaskScheduler.ts';
 import {
   scheduleTextareaAutosizeMeasure,
   type TextareaAutosizeMeasure,
 } from './measure/index.ts';
+
+const TEXTAREA_VIEWPORT_MARGIN_RATIO = 1;
 
 const TEXTAREA_MEASUREMENT_ATTRIBUTES = [
   'class',
@@ -20,6 +28,10 @@ const TEXTAREA_MUTATION_OPTIONS = {
   attributes: true,
   attributeFilter: [...TEXTAREA_MEASUREMENT_ATTRIBUTES],
 } satisfies MutationObserverInit;
+
+const TEXTAREA_RESIZE_OPTIONS = {
+  box: 'border-box',
+} satisfies ResizeObserverOptions;
 
 type TextareaStoreListener = () => void;
 
@@ -39,16 +51,6 @@ export type TextareaStore = {
   setOptions: (options: TextareaStoreOptions) => void;
 };
 
-const getBorderBoxInlineSize = (entry: ResizeObserverEntry): number => {
-  const borderBoxSize = entry.borderBoxSize[0];
-
-  if (typeof borderBoxSize !== 'undefined') {
-    return borderBoxSize.inlineSize;
-  }
-
-  return entry.target.getBoundingClientRect().width;
-};
-
 const getAttributeSignature = (element: HTMLTextAreaElement): string => {
   const values = TEXTAREA_MEASUREMENT_ATTRIBUTES.map((attribute) => {
     return element.getAttribute(attribute);
@@ -64,9 +66,9 @@ export const createTextareaStore = (
   let options = initialOptions;
   let element: HTMLTextAreaElement | null = null;
   let measuredAttributeSignature = '';
-  let borderBoxInlineSize = 0;
-  let cancelMeasure: (() => void) | null = null;
-  let remeasureRequested = false;
+  let contentBoxWidth: number | undefined;
+  let measureToken: object | undefined;
+  let cancelMeasure: (() => void) | undefined;
   let unobserveResize: (() => void) | null = null;
   let unobserveMutation: (() => void) | null = null;
   const listeners = new Set<TextareaStoreListener>();
@@ -95,52 +97,83 @@ export const createTextareaStore = (
     notify();
   };
 
-  const measureAndCommit = () => {
-    if (!options.enabled) {
-      commitState(null);
-      return;
-    }
-
-    if (element === null) {
-      return;
-    }
-
-    if (cancelMeasure !== null) {
-      remeasureRequested = true;
-      return;
-    }
-
-    measuredAttributeSignature = getAttributeSignature(element);
+  const enqueueMeasure = () => {
     const measuredElement = element;
+    const measuredOptions = options;
+
+    if (!measuredOptions.enabled || measuredElement === null) {
+      return;
+    }
+
+    if (cancelMeasure) {
+      cancelMeasure();
+    }
+
+    const nextMeasureToken = {};
+
+    measureToken = nextMeasureToken;
+    measuredAttributeSignature = getAttributeSignature(measuredElement);
     cancelMeasure = scheduleTextareaAutosizeMeasure(
       measuredElement,
-      options.minRows,
-      options.maxRows,
-      (measure, measuredInlineSize) => {
-        cancelMeasure = null;
-
-        if (element === measuredElement && options.enabled) {
-          if (measure !== null) {
-            borderBoxInlineSize = measuredInlineSize;
-            commitState(measure);
-          }
+      measuredOptions.minRows,
+      measuredOptions.maxRows,
+      (measure) => {
+        if (
+          measureToken !== nextMeasureToken
+          || element !== measuredElement
+          || options !== measuredOptions
+          || !measuredOptions.enabled
+        ) {
+          return;
         }
 
-        if (remeasureRequested) {
-          remeasureRequested = false;
-          measureAndCommit();
+        measureToken = undefined;
+        cancelMeasure = undefined;
+
+        if (measure === null) {
+          return;
         }
+
+        commitState(measure);
       },
     );
   };
 
-  const stopMeasure = () => {
-    remeasureRequested = false;
+  const cancelEnqueuedMeasure = () => {
+    measureToken = undefined;
 
     if (cancelMeasure) {
       cancelMeasure();
-      cancelMeasure = null;
+      cancelMeasure = undefined;
     }
+  };
+
+  const getMeasureViewportProximity = (): ViewportProximity => {
+    if (element === null) {
+      return 'near';
+    }
+
+    return getElementViewportProximity(element, {
+      verticalMargin: window.innerHeight * TEXTAREA_VIEWPORT_MARGIN_RATIO,
+    });
+  };
+
+  const scheduleMeasure = () => {
+    cancelEnqueuedMeasure();
+
+    if (!options.enabled || element === null) {
+      return;
+    }
+
+    viewportPriorityTaskScheduler.schedule(
+      enqueueMeasure,
+      getMeasureViewportProximity(),
+    );
+  };
+
+  const stopMeasure = () => {
+    viewportPriorityTaskScheduler.cancel(enqueueMeasure);
+    cancelEnqueuedMeasure();
   };
 
   const stopObserve = () => {
@@ -153,6 +186,8 @@ export const createTextareaStore = (
       unobserveMutation();
       unobserveMutation = null;
     }
+
+    contentBoxWidth = undefined;
   };
 
   const observeElement = () => {
@@ -162,22 +197,17 @@ export const createTextareaStore = (
       return;
     }
 
-    borderBoxInlineSize = observedElement.getBoundingClientRect().width;
     measuredAttributeSignature = getAttributeSignature(observedElement);
     unobserveResize = observeElementResize(observedElement, (entry) => {
-      if (entry.target !== element) {
+      const nextWidth = getEntryContentBoxWidth(entry);
+
+      if (nextWidth === contentBoxWidth) {
         return;
       }
 
-      const nextInlineSize = getBorderBoxInlineSize(entry);
-
-      if (nextInlineSize === borderBoxInlineSize) {
-        return;
-      }
-
-      borderBoxInlineSize = nextInlineSize;
-      measureAndCommit();
-    });
+      contentBoxWidth = nextWidth;
+      scheduleMeasure();
+    }, TEXTAREA_RESIZE_OPTIONS);
     unobserveMutation = observeElementMutation(
       observedElement,
       () => {
@@ -191,7 +221,7 @@ export const createTextareaStore = (
           return;
         }
 
-        measureAndCommit();
+        scheduleMeasure();
       },
       TEXTAREA_MUTATION_OPTIONS,
     );
@@ -206,7 +236,7 @@ export const createTextareaStore = (
         listeners.delete(listener);
       };
     },
-    requestMeasure: measureAndCommit,
+    requestMeasure: scheduleMeasure,
     setElement: (nextElement) => {
       if (element === nextElement) {
         return;

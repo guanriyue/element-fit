@@ -1,4 +1,4 @@
 export {
-  scheduleTextareaAutosizeMeasureInOneFrame as scheduleTextareaAutosizeMeasure,
-} from './scheduleTextareaAutosizeMeasureInOneFrame.ts';
+  scheduleTextareaAutosizeMeasure,
+} from './scheduleTextareaAutosizeMeasure.ts';
 export type { TextareaAutosizeMeasure } from './types.ts';
