@@ -3,6 +3,7 @@ import {
   getElementViewportProximity,
   type ViewportProximity,
 } from '../_internal/getElementViewportProximity.ts';
+import { getEntryContentBoxWidth } from '../_internal/getEntryContentBoxWidth.ts';
 import { observeElementMutation } from '../_internal/observeElementMutation.ts';
 import { viewportPriorityTaskScheduler } from '../_internal/viewportPriorityTaskScheduler.ts';
 import { measureInlineOverflowWithRootContentBoxWidth } from './measureInlineOverflow.ts';
@@ -208,7 +209,7 @@ export const createInlineOverflowStore = (
     }
 
     unobserveRootResize = observeElementResize(rootElement, (entry) => {
-      const width = entry.contentBoxSize[0]?.inlineSize ?? entry.contentRect.width;
+      const width = getEntryContentBoxWidth(entry);
 
       if (innerData.rootContentBoxWidth === width) {
         return;
