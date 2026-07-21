@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InlineOverflow } from './InlineOverflow.tsx';
 import { measureInlineOverflow } from './measureInlineOverflow.ts';
@@ -39,7 +39,10 @@ const setElementWidth = (element: HTMLElement, scrollWidth: number, clientWidth:
 
 beforeEach(() => {
   globalThis.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver;
-  vi.stubGlobal('requestAnimationFrame', undefined);
+  vi.spyOn(document, 'createRange').mockReturnValue({
+    selectNodeContents: vi.fn(),
+    getBoundingClientRect: () => ({ width: 0 }),
+  } as unknown as Range);
 });
 
 afterEach(() => {
@@ -53,8 +56,9 @@ describe('measureInlineOverflow', () => {
   it('measures overflow against the Root content box', () => {
     const root = document.createElement('span');
     const content = document.createElement('span');
+    content.textContent = 'content';
     setElementWidth(root, 120, 120);
-    setElementWidth(content, 100.5, 90);
+    setElementWidth(content, 102, 90);
     vi.spyOn(globalThis, 'getComputedStyle').mockReturnValue({
       paddingInlineStart: '8px',
       paddingInlineEnd: '12px',
@@ -90,7 +94,7 @@ describe('InlineOverflow', () => {
     expect(content.style.textOverflow).toBe('ellipsis');
   });
 
-  it('supports asChild and forwards the Content ref', () => {
+  it('supports asChild, forwards the Content ref, and allows child style overrides', () => {
     let element: HTMLElement | null = null;
 
     render(
@@ -112,12 +116,12 @@ describe('InlineOverflow', () => {
 
     expect(element).toBe(button);
     expect(button.style.color).toBe('blue');
-    expect(button.style.whiteSpace).toBe('nowrap');
+    expect(button.style.whiteSpace).toBe('normal');
     expect(button.style.overflow).toBe('hidden');
     expect(button.style.textOverflow).toBe('ellipsis');
   });
 
-  it('calls onOverflowChange for the first measurement and boolean changes only', () => {
+  it('calls onOverflowChange for the first measurement and boolean changes only', async () => {
     const onOverflowChange = vi.fn();
 
     render(
@@ -143,7 +147,9 @@ describe('InlineOverflow', () => {
       </InlineOverflow>,
     );
 
-    expect(onOverflowChange).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(onOverflowChange).toHaveBeenCalledTimes(1);
+    });
     expect(onOverflowChange).toHaveBeenLastCalledWith(true);
     const overflowElement = screen.getByTestId('overflow');
     const contentElement = screen.getByTestId('content');
@@ -151,14 +157,14 @@ describe('InlineOverflow', () => {
     expect(overflowElement).toHaveAttribute('data-overflow', '');
 
     setElementWidth(contentElement, 130, 100);
-    act(() => {
+    await act(async () => {
       nativeResizeObserver?.emit([{ target: contentElement }]);
     });
 
     expect(onOverflowChange).toHaveBeenCalledTimes(1);
 
     setElementWidth(contentElement, 99, 99);
-    act(() => {
+    await act(async () => {
       nativeResizeObserver?.emit([{ target: contentElement }]);
     });
 
@@ -167,7 +173,7 @@ describe('InlineOverflow', () => {
     expect(overflowElement).not.toHaveAttribute('data-overflow');
   });
 
-  it('treats a replacement element as a fresh measurement', () => {
+  it('treats a replacement element as a fresh measurement', async () => {
     const onOverflowChange = vi.fn();
     const registerWidth = (node: HTMLElement | null) => {
       if (node !== null) {
@@ -184,6 +190,10 @@ describe('InlineOverflow', () => {
       </InlineOverflow>,
     );
 
+    await waitFor(() => {
+      expect(onOverflowChange).toHaveBeenCalledTimes(1);
+    });
+
     rerender(
       <InlineOverflow onOverflowChange={onOverflowChange}>
         <InlineOverflow.Content asChild ref={registerWidth}>
@@ -194,7 +204,9 @@ describe('InlineOverflow', () => {
       </InlineOverflow>,
     );
 
-    expect(onOverflowChange).toHaveBeenCalledTimes(2);
+    await waitFor(() => {
+      expect(onOverflowChange).toHaveBeenCalledTimes(2);
+    });
     expect(onOverflowChange.mock.calls.map(([overflow]) => overflow)).toEqual([true, true]);
   });
 
@@ -210,7 +222,7 @@ describe('InlineOverflow', () => {
     expect(screen.queryByTestId('accessory')).not.toBeInTheDocument();
   });
 
-  it('shows Accessory when Content overflows its reserved space', () => {
+  it('shows Accessory when Content overflows its reserved space', async () => {
     const onOverflowChange = vi.fn();
 
     render(
@@ -235,7 +247,7 @@ describe('InlineOverflow', () => {
       </InlineOverflow>,
     );
 
-    const accessory = screen.getByTestId('accessory');
+    const accessory = await screen.findByTestId('accessory');
 
     expect(onOverflowChange).toHaveBeenCalledWith(true);
     expect(accessory.style.display).toBe('');

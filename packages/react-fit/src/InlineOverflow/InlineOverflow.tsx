@@ -58,6 +58,7 @@ export interface InlineOverflowProps extends React.ComponentPropsWithoutRef<type
  * `InlineOverflow.Content` 接受的属性。
  *
  * 同时支持 `Primitive.span` 的原生属性与 `asChild`。
+ * 使用 `asChild` 时，child 自身的同名 inline style 具有最终优先级。
  */
 export type InlineOverflowContentProps = React.ComponentPropsWithoutRef<typeof Primitive.span>;
 
