@@ -1,7 +1,7 @@
 # InlineOverflow
 
 `InlineOverflow` 用于测量单行内容是否发生横向溢出，并根据派生的 `overflow` 状态组合附属 UI。
-它不内置 Tooltip、Popover、展开按钮或具体布局。
+它不内置 Tooltip、Popover、展开按钮、具体布局或内容裁剪样式。
 
 它适合表格单元格、名称、路径和标签等宽度受限的单行内容。不适合多行截断、纵向书写模式、
 复杂 transform 或需要反事实测量的场景。
@@ -14,13 +14,14 @@ import { InlineOverflow } from '@guanriyue/react-fit/inline-overflow';
 
 ## Basic Example
 
-Root 不提供默认布局样式。下面使用 Tailwind 建立 inline flex 布局，并允许 Content 收缩：
+Root 和 Content 都不提供默认样式。下面使用 Tailwind 建立 inline flex 布局、允许 Content 收缩，
+并由调用方选择单行省略样式：
 
 ```tsx
 function NameCell({ name }: { name: string }) {
   return (
     <InlineOverflow className="inline-flex max-w-full min-w-0">
-      <InlineOverflow.Content className="min-w-0 flex-1">
+      <InlineOverflow.Content className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
         {name}
       </InlineOverflow.Content>
 
@@ -49,7 +50,7 @@ Accessory 只根据 `overflow` 状态显示或隐藏，不参与溢出判定，�
 
 ```tsx
 <InlineOverflow className="grid w-64 min-w-0 gap-1">
-  <InlineOverflow.Content className="min-w-0">
+  <InlineOverflow.Content className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
     {description}
   </InlineOverflow.Content>
 
@@ -66,13 +67,17 @@ Accessory 只根据 `overflow` 状态显示或隐藏，不参与溢出判定，�
 
 ## As Child
 
-Root、Content 和 Accessory 都支持 `asChild`。组件会将 ref、状态属性和核心行为样式合并到唯一 child：
+Root、Content 和 Accessory 都支持 `asChild`。组件会将 ref、状态属性和行为连接到唯一 child，
+但不会注入展示样式：
 
 ```tsx
 <InlineOverflow asChild onOverflowChange={handleOverflowChange}>
   <div className="flex w-full min-w-0">
     <InlineOverflow.Content asChild>
-      <a className="min-w-0 flex-1" href={url}>
+      <a
+        className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+        href={url}
+      >
         {label}
       </a>
     </InlineOverflow.Content>
@@ -84,19 +89,38 @@ Root、Content 和 Accessory 都支持 `asChild`。组件会将 ref、状态属�
 </InlineOverflow>
 ```
 
-`asChild` 遵循 Radix Slot 的属性合并顺序，child 自身的同名 inline style 具有最终优先级。组件不会再次
-强制覆盖这些样式；如果 child 修改 `white-space`、`overflow` 或 `text-overflow`，开发者需要自行保证
-单行省略和 overflow 测量仍符合预期。
+`asChild` 遵循 Radix Slot 的属性合并顺序。由于 Content 不提供默认样式，普通渲染和 `asChild`
+都由调用方完整控制 `white-space`、`overflow`、`text-overflow` 等属性。
 
 ## Styles And Layout
 
-组件只默认应用与行为直接相关的样式：
+组件不提供任何默认样式。Root 负责表达目标可用宽度，Content 是唯一的测量节点；如何排版和展示
+Content 完全由调用方决定。
 
-- Content 使用 `white-space: nowrap`、`overflow: hidden` 和 `text-overflow: ellipsis`。
-- Root 不提供默认样式。
+常见的单行省略策略可以写成：
+
+```tsx
+<InlineOverflow.Content
+  style={{
+    minWidth: 0,
+    flex: 1,
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  }}
+>
+  {label}
+</InlineOverflow.Content>
+```
+
+如果业务希望直接裁剪，可以换成 `overflow: clip`；如果只需要读取 `overflow` 状态，也可以不裁剪内容。
+`overflow` 和 `text-overflow` 不参与组件的状态控制，组件不会覆盖调用方的选择。
 
 调用方需要让 Root 形成可测量的盒子并提供实际宽度约束，同时决定 Content 如何获得和收缩宽度。
 可以使用 flex、grid、block 或其他符合 UI 设计的布局。
+
+在文本场景中，调用方需要设置 `white-space: nowrap` 或用等价方式建立单行排版。如果允许换行，内容可能
+通过换行消除横向 overflow，此时结果不再表示单行内容是否放得下。
 
 在 flex 布局中，通常需要为 Content 设置 `min-width: 0`。在 grid 布局中，通常需要使用
 `minmax(0, 1fr)`，或者同样为 Content 设置 `min-width: 0`。

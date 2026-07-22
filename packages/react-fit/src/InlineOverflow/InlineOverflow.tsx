@@ -14,12 +14,6 @@ import {
   type InlineOverflowStore,
 } from './store.ts';
 
-const INLINE_OVERFLOW_CONTENT_CORE_STYLE: React.CSSProperties = {
-  whiteSpace: 'nowrap',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-};
-
 const INLINE_OVERFLOW_NAME = 'InlineOverflow';
 const INLINE_OVERFLOW_CONTENT_NAME = `${INLINE_OVERFLOW_NAME}.Content`;
 const INLINE_OVERFLOW_ACCESSORY_NAME = `${INLINE_OVERFLOW_NAME}.Accessory`;
@@ -58,7 +52,7 @@ export interface InlineOverflowProps extends React.ComponentPropsWithoutRef<type
  * `InlineOverflow.Content` 接受的属性。
  *
  * 同时支持 `Primitive.span` 的原生属性与 `asChild`。
- * 使用 `asChild` 时，child 自身的同名 inline style 具有最终优先级。
+ * 组件不注入展示样式，单行排版与裁剪策略由调用方控制。
  */
 export type InlineOverflowContentProps = React.ComponentPropsWithoutRef<typeof Primitive.span>;
 
@@ -74,13 +68,8 @@ type InlineOverflowInternalProps = InlineOverflowProps & {
 };
 
 const InlineOverflowRoot = forwardRef<HTMLElement, InlineOverflowProps>((props, forwardedRef) => {
-  const {
-    __debugDisableRangeFallback,
-    asChild,
-    children,
-    onOverflowChange,
-    ...rootProps
-  } = props as InlineOverflowInternalProps;
+  const { __debugDisableRangeFallback, asChild, children, onOverflowChange, ...rootProps } =
+    props as InlineOverflowInternalProps;
   // biome-ignore lint/correctness/useExhaustiveDependencies: 初始化选项
   const store = useMemo(() => {
     return createInlineOverflowStore(onOverflowChange, __debugDisableRangeFallback === true);
@@ -115,12 +104,12 @@ const InlineOverflowRoot = forwardRef<HTMLElement, InlineOverflowProps>((props, 
 InlineOverflowRoot.displayName = INLINE_OVERFLOW_NAME;
 
 /**
- * 渲染唯一的单行内容测量节点，并应用省略所需的核心样式。
+ * 渲染唯一的横向溢出测量节点，不提供默认样式。
  *
  * @example
  * ```tsx
  * <InlineOverflow className="inline-flex max-w-full min-w-0">
- *   <InlineOverflow.Content className="min-w-0 flex-1">
+ *   <InlineOverflow.Content className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
  *     {label}
  *   </InlineOverflow.Content>
  * </InlineOverflow>
@@ -128,21 +117,12 @@ InlineOverflowRoot.displayName = INLINE_OVERFLOW_NAME;
  */
 export const InlineOverflowContent = forwardRef<HTMLElement, InlineOverflowContentProps>(
   (props, forwardedRef) => {
-    const { asChild, children, style, ...contentProps } = props;
+    const { asChild, children, ...contentProps } = props;
     const store = useInlineOverflowStore(INLINE_OVERFLOW_CONTENT_NAME);
     const composedRef = useComposedRefs(forwardedRef, store.setContentElement);
-    const contentStyle: React.CSSProperties = {
-      ...style,
-      ...INLINE_OVERFLOW_CONTENT_CORE_STYLE,
-    };
 
     return (
-      <Primitive.span
-        {...contentProps}
-        asChild={asChild}
-        ref={composedRef}
-        style={contentStyle}
-      >
+      <Primitive.span {...contentProps} asChild={asChild} ref={composedRef}>
         {children}
       </Primitive.span>
     );
@@ -159,7 +139,7 @@ InlineOverflowContent.displayName = INLINE_OVERFLOW_CONTENT_NAME;
  * @example
  * ```tsx
  * <InlineOverflow className="grid w-64 min-w-0 gap-1">
- *   <InlineOverflow.Content className="min-w-0">
+ *   <InlineOverflow.Content className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
  *     {label}
  *   </InlineOverflow.Content>
  *   <InlineOverflow.Accessory asChild>
@@ -177,12 +157,7 @@ export const InlineOverflowAccessory = forwardRef<HTMLElement, InlineOverflowAcc
       return null;
     }
 
-    return (
-      <Primitive.span
-        ref={forwardedRef}
-        {...props}
-      />
-    );
+    return <Primitive.span ref={forwardedRef} {...props} />;
   },
 );
 
@@ -191,7 +166,8 @@ InlineOverflowAccessory.displayName = INLINE_OVERFLOW_ACCESSORY_NAME;
 /**
  * 管理单行横向溢出测量，并向 Content 和 Accessory 提供派生状态。
  *
- * Root 不提供布局样式。调用方需要为 Root 和 Content 建立可测量、可收缩的布局。
+ * Root 和 Content 都不提供样式。调用方需要建立可测量、可收缩的布局，
+ * 并决定单行排版与裁剪策略。
  *
  * @example
  * ```tsx
@@ -199,7 +175,7 @@ InlineOverflowAccessory.displayName = INLINE_OVERFLOW_ACCESSORY_NAME;
  *   className="inline-flex max-w-full min-w-0"
  *   onOverflowChange={setOverflow}
  * >
- *   <InlineOverflow.Content className="min-w-0 flex-1">
+ *   <InlineOverflow.Content className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
  *     {label}
  *   </InlineOverflow.Content>
  *   <InlineOverflow.Accessory asChild>

@@ -71,15 +71,10 @@ describe('measureInlineOverflow', () => {
 });
 
 describe('InlineOverflow', () => {
-  it('preserves Root layout styles and protects Content overflow styles', () => {
+  it('does not provide presentation styles', () => {
     render(
       <InlineOverflow data-testid="root" style={{ display: 'block' }}>
-        <InlineOverflow.Content
-          data-testid="content"
-          style={{ color: 'red', whiteSpace: 'normal' }}
-        >
-          content
-        </InlineOverflow.Content>
+        <InlineOverflow.Content data-testid="content">content</InlineOverflow.Content>
       </InlineOverflow>,
     );
 
@@ -88,13 +83,35 @@ describe('InlineOverflow', () => {
 
     expect(root.style.display).toBe('block');
     expect(root.style.minWidth).toBe('');
-    expect(content.style.color).toBe('red');
-    expect(content.style.whiteSpace).toBe('nowrap');
-    expect(content.style.overflow).toBe('hidden');
-    expect(content.style.textOverflow).toBe('ellipsis');
+    expect(content.style.cssText).toBe('');
   });
 
-  it('supports asChild, forwards the Content ref, and allows child style overrides', () => {
+  it('preserves caller Content styles', () => {
+    render(
+      <InlineOverflow>
+        <InlineOverflow.Content
+          data-testid="content"
+          style={{
+            color: 'red',
+            overflow: 'visible',
+            textOverflow: 'clip',
+            whiteSpace: 'normal',
+          }}
+        >
+          content
+        </InlineOverflow.Content>
+      </InlineOverflow>,
+    );
+
+    const content = screen.getByTestId('content');
+
+    expect(content.style.color).toBe('red');
+    expect(content.style.whiteSpace).toBe('normal');
+    expect(content.style.overflow).toBe('visible');
+    expect(content.style.textOverflow).toBe('clip');
+  });
+
+  it('supports asChild, forwards the Content ref, and preserves child styles', () => {
     let element: HTMLElement | null = null;
 
     render(
@@ -117,8 +134,8 @@ describe('InlineOverflow', () => {
     expect(element).toBe(button);
     expect(button.style.color).toBe('blue');
     expect(button.style.whiteSpace).toBe('normal');
-    expect(button.style.overflow).toBe('hidden');
-    expect(button.style.textOverflow).toBe('ellipsis');
+    expect(button.style.overflow).toBe('');
+    expect(button.style.textOverflow).toBe('');
   });
 
   it('calls onOverflowChange for the first measurement and boolean changes only', async () => {
