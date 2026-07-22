@@ -12,8 +12,9 @@ type InlineOverflowDebugProps = ComponentProps<typeof InlineOverflow> & {
   __debugDisableRangeFallback?: boolean;
 };
 
-const InlineOverflowDebug = InlineOverflow as ComponentType<InlineOverflowDebugProps> &
-  typeof InlineOverflow;
+const InlineOverflowDebug =
+  InlineOverflow as ComponentType<InlineOverflowDebugProps> &
+    typeof InlineOverflow;
 
 const tooltipText =
   'project active element-fit InlineOverflow / long-inline-node-chain.tsx';
@@ -42,7 +43,8 @@ const InlineOverflowInlineNodesDemo = () => {
   const [overflow, setOverflow] = useState(false);
   const [overflowWithoutFallback, setOverflowWithoutFallback] = useState(false);
   const [tooltipOpen, setTooltipOpen] = useState(false);
-  const [tooltipOpenWithoutFallback, setTooltipOpenWithoutFallback] = useState(false);
+  const [tooltipOpenWithoutFallback, setTooltipOpenWithoutFallback] =
+    useState(false);
   const handleTooltipOpenChange = (nextOpen: boolean) => {
     setTooltipOpen(overflow && nextOpen);
   };
@@ -87,7 +89,7 @@ const InlineOverflowInlineNodesDemo = () => {
                       }
                     }}
                   >
-                    <InlineOverflow.Content className="min-w-0 flex-1">
+                    <InlineOverflow.Content className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
                       <InlineNodesContent />
                     </InlineOverflow.Content>
                   </InlineOverflowDebug>
@@ -117,7 +119,7 @@ const InlineOverflowInlineNodesDemo = () => {
                       }
                     }}
                   >
-                    <InlineOverflow.Content className="min-w-0 flex-1">
+                    <InlineOverflow.Content className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
                       <InlineNodesContent />
                     </InlineOverflow.Content>
                   </InlineOverflowDebug>

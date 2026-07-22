@@ -50,12 +50,15 @@ const InlineOverflowAccessorySeparateRowDemo = () => {
                   }
                 }}
               >
-                <InlineOverflow.Content className="min-w-0">
+                <InlineOverflow.Content className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
                   {text}
                 </InlineOverflow.Content>
 
                 <TooltipTrigger asChild>
-                  <InlineOverflow.Accessory asChild className="justify-self-start">
+                  <InlineOverflow.Accessory
+                    asChild
+                    className="justify-self-start"
+                  >
                     <Button
                       type="button"
                       variant="link"

@@ -31,7 +31,7 @@ const InlineOverflowAsChildDemo = () => {
             <InlineOverflow.Content asChild>
               <a
                 href="#as-child"
-                className="min-w-0 flex-1 text-sm underline-offset-4 hover:underline"
+                className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm underline-offset-4 hover:underline"
               >
                 {label}
               </a>

@@ -31,7 +31,7 @@ const InlineOverflowNarrowDemo = () => {
               setOverflow(nextOverflow);
             }}
           >
-            <InlineOverflow.Content className="min-w-0 flex-1">
+            <InlineOverflow.Content className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
               {text}
             </InlineOverflow.Content>
           </InlineOverflow>

@@ -11,8 +11,9 @@ type InlineOverflowDebugProps = ComponentProps<typeof InlineOverflow> & {
   __debugDisableRangeFallback?: boolean;
 };
 
-const InlineOverflowDebug = InlineOverflow as ComponentType<InlineOverflowDebugProps> &
-  typeof InlineOverflow;
+const InlineOverflowDebug =
+  InlineOverflow as ComponentType<InlineOverflowDebugProps> &
+    typeof InlineOverflow;
 
 const defaultText =
   'element-fit/packages/react-fit/src/InlineOverflow/very-long-file-name-for-observation.tsx';
@@ -53,7 +54,7 @@ const InlineOverflowWideDemo = () => {
                 setOverflow(nextOverflow);
               }}
             >
-              <InlineOverflow.Content className="min-w-0 flex-1">
+              <InlineOverflow.Content className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
                 {text}
               </InlineOverflow.Content>
             </InlineOverflowDebug>
@@ -70,7 +71,7 @@ const InlineOverflowWideDemo = () => {
                 setOverflowWithoutFallback(nextOverflow);
               }}
             >
-              <InlineOverflow.Content className="min-w-0 flex-1">
+              <InlineOverflow.Content className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
                 {text}
               </InlineOverflow.Content>
             </InlineOverflowDebug>
