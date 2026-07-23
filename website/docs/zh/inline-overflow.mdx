@@ -86,6 +86,18 @@ Root、Content 和 Accessory 都支持 `asChild`。组件会把 ref、状态属�
 
 ```
 
+## 单元素模式
+
+如果不需要 Root 和 Content 分别渲染两个 DOM 节点，可以让 Root 使用 `asChild`，并将 Content 作为它的唯一 child。Root 的 ref、`data-overflow` 和 Content 的测量 ref 会合并到同一个元素上。
+
+单元素模式支持直接在共享元素上设置 inline padding。组件会使用同一个元素的 `scrollWidth` 和 `clientWidth` 比较 padding box，并在临界范围内继续使用 content box 和 Range 校正，避免把元素自身的 padding 误判为内容溢出。
+
+```tsx file="<root>/src/demos/inline-overflow/single-element.tsx" preview
+
+```
+
+这种形式适合只需要 overflow 状态或 `data-overflow` 的紧凑结构。需要组合 Accessory 时，建议继续使用分离的 Root 和 Content，避免 Accessory 进入 Content 的测量子树。
+
 ## 多个 Inline 节点
 
 下面示例包含 `inline-block` 和 `inline-flex` 节点。Range 会包含普通 flow 中被选中的文本和顶层元素 border area，但 margin、伪元素、定位和 transform 等不属于可靠测量范围。两组内容、布局和宽度保持一致，用于观察此类内容在“启用边界校正”和“关闭边界校正”时的结果。
@@ -111,7 +123,7 @@ Content 内可以包含多个 inline / inline-block / inline-flex 节点。组�
 - flex 布局通常需要为 Content 设置 `min-width: 0`。
 - grid 布局通常需要使用 `minmax(0, 1fr)`，或者为 Content 设置 `min-width: 0`。
 - Root padding 会参与测量；组件比较 Content 的 `scrollWidth` 与 Root 扣除 inline padding 后的 content box width。
-- 不要在 Content 上增加 `padding`、`margin` 等会改变布局计算的样式。Content 是唯一测量节点，这类样式会让“内容宽度”和“目标可用宽度”的关系变得不稳定，破坏组件内部的计算模型。
+- Root 与 Content 分离时，不要在 Content 上增加 `padding`、`margin` 等会改变布局计算的样式。这类样式会让“内容宽度”和“目标可用宽度”的关系变得不稳定。单元素模式可以在 Root 与 Content 共享的元素上设置 padding。
 
 ## 观测边界
 
