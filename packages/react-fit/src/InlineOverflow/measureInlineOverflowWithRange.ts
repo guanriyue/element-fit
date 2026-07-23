@@ -10,9 +10,8 @@ export const measureInlineContentWidthWithRange = (content: HTMLElement): number
 };
 
 /**
- * 测量 Content 是否超出 Root 的 content box width。
+ * 使用 Range width 高精度测量 Content 是否超出可用的 content-box width。
  *
- * 当整数精度的 scroll width 位于边界时，使用 Range width 进行高精度补充测量。
  * Range 会包含文本片段以及被完整选中的顶层元素 border area，因此可以处理
  * 普通单行 flow 中的文本、元素和混合内容。
  *
@@ -21,26 +20,9 @@ export const measureInlineContentWidthWithRange = (content: HTMLElement): number
  */
 export const measureInlineOverflowWithRange = (params: {
   content: HTMLElement;
-  rootContentBoxWidth: number;
-  disableRangeFallback?: boolean;
-}): { overflow: boolean } => {
-  const { content, rootContentBoxWidth } = params;
-  const contentScrollWidth = content.scrollWidth;
-  const widthDifference = contentScrollWidth - rootContentBoxWidth;
+  availableContentWidth: number;
+}): boolean => {
+  const { content, availableContentWidth } = params;
 
-  if (params.disableRangeFallback === true) {
-    return { overflow: widthDifference > 0 };
-  }
-
-  if (widthDifference >= 1) {
-    return { overflow: true };
-  }
-
-  if (widthDifference <= -1 || content.childNodes.length === 0) {
-    return { overflow: false };
-  }
-
-  return {
-    overflow: measureInlineContentWidthWithRange(content) > rootContentBoxWidth,
-  };
+  return measureInlineContentWidthWithRange(content) > availableContentWidth;
 };

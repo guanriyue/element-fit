@@ -3,7 +3,10 @@
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InlineOverflow } from './InlineOverflow.tsx';
-import { measureInlineOverflow } from './measureInlineOverflow.ts';
+import {
+  measureInlineOverflow,
+  measureInlineOverflowWithRootContentBoxWidth,
+} from './measureInlineOverflow.ts';
 
 type MockEntry = Pick<ResizeObserverEntry, 'target'>;
 
@@ -64,9 +67,39 @@ describe('measureInlineOverflow', () => {
       paddingInlineEnd: '12px',
     } as CSSStyleDeclaration);
 
-    expect(measureInlineOverflow({ root, content })).toEqual({
-      overflow: true,
-    });
+    expect(measureInlineOverflow({ root, content })).toBe(true);
+  });
+
+  it('uses the padding box when Root and Content are the same element', () => {
+    const element = document.createElement('span');
+    element.textContent = 'content';
+    setElementWidth(element, 120, 120);
+
+    expect(
+      measureInlineOverflowWithRootContentBoxWidth({
+        root: element,
+        content: element,
+        rootContentBoxWidth: 100,
+      }),
+    ).toBe(false);
+  });
+
+  it('uses the content box for the Range fallback when Root and Content are the same element', () => {
+    const element = document.createElement('span');
+    element.textContent = 'content';
+    setElementWidth(element, 120, 120);
+    vi.mocked(document.createRange).mockReturnValue({
+      selectNodeContents: vi.fn(),
+      getBoundingClientRect: () => ({ width: 100.25 }),
+    } as unknown as Range);
+
+    expect(
+      measureInlineOverflowWithRootContentBoxWidth({
+        root: element,
+        content: element,
+        rootContentBoxWidth: 100,
+      }),
+    ).toBe(true);
   });
 });
 

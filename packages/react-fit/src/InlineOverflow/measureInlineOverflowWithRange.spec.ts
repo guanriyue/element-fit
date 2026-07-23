@@ -3,52 +3,46 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { measureInlineOverflowWithRange } from './measureInlineOverflowWithRange.ts';
 
-const setScrollWidth = (element: HTMLElement, scrollWidth: number) => {
-  Object.defineProperty(element, 'scrollWidth', {
-    configurable: true,
-    value: scrollWidth,
-  });
-};
-
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
 describe('measureInlineOverflowWithRange', () => {
-  it('reports overflow when scroll width exceeds the Root content box width', () => {
+  it('reports overflow when the Range width exceeds the available content width', () => {
     const content = document.createElement('span');
     content.textContent = 'content';
-    setScrollWidth(content, 101);
-    const createRange = vi.spyOn(content.ownerDocument, 'createRange');
+    vi.spyOn(content.ownerDocument, 'createRange').mockReturnValue({
+      selectNodeContents: vi.fn(),
+      getBoundingClientRect: () => ({ width: 100.25 }),
+    } as unknown as Range);
 
     expect(
       measureInlineOverflowWithRange({
         content,
-        rootContentBoxWidth: 100,
+        availableContentWidth: 100,
       }),
-    ).toEqual({ overflow: true });
-    expect(createRange).not.toHaveBeenCalled();
+    ).toBe(true);
   });
 
-  it('reports no overflow when scroll width is less than the Root content box width', () => {
+  it('reports no overflow when the Range width fits the available content width', () => {
     const content = document.createElement('span');
     content.textContent = 'content';
-    setScrollWidth(content, 99);
-    const createRange = vi.spyOn(content.ownerDocument, 'createRange');
+    vi.spyOn(content.ownerDocument, 'createRange').mockReturnValue({
+      selectNodeContents: vi.fn(),
+      getBoundingClientRect: () => ({ width: 99.75 }),
+    } as unknown as Range);
 
     expect(
       measureInlineOverflowWithRange({
         content,
-        rootContentBoxWidth: 100,
+        availableContentWidth: 100,
       }),
-    ).toEqual({ overflow: false });
-    expect(createRange).not.toHaveBeenCalled();
+    ).toBe(false);
   });
 
-  it('uses the Range width for equal-width plain text content', () => {
+  it('selects all plain text content', () => {
     const content = document.createElement('span');
     content.append('content', ' text');
-    setScrollWidth(content, 100);
     const selectNodeContents = vi.fn();
     const getClientRects = vi.fn(() => {
       throw new Error('getClientRects must not be used');
@@ -62,17 +56,16 @@ describe('measureInlineOverflowWithRange', () => {
     expect(
       measureInlineOverflowWithRange({
         content,
-        rootContentBoxWidth: 100,
+        availableContentWidth: 100,
       }),
-    ).toEqual({ overflow: true });
+    ).toBe(true);
     expect(selectNodeContents).toHaveBeenCalledWith(content);
     expect(getClientRects).not.toHaveBeenCalled();
   });
 
-  it('uses a Range for equal-width content containing an element', () => {
+  it('uses a Range for content containing an element', () => {
     const content = document.createElement('span');
     content.append(document.createElement('span'));
-    setScrollWidth(content, 100);
     const selectNodeContents = vi.fn();
     vi.spyOn(content.ownerDocument, 'createRange').mockReturnValue({
       selectNodeContents,
@@ -82,39 +75,22 @@ describe('measureInlineOverflowWithRange', () => {
     expect(
       measureInlineOverflowWithRange({
         content,
-        rootContentBoxWidth: 100,
+        availableContentWidth: 100,
       }),
-    ).toEqual({ overflow: true });
+    ).toBe(true);
     expect(selectNodeContents).toHaveBeenCalledWith(content);
   });
 
-  it('can disable the Range fallback for debug comparisons', () => {
+  it('does not create a Range when Content has no child nodes', () => {
     const content = document.createElement('span');
-    content.textContent = 'content';
-    setScrollWidth(content, 100);
     const createRange = vi.spyOn(content.ownerDocument, 'createRange');
 
     expect(
       measureInlineOverflowWithRange({
         content,
-        rootContentBoxWidth: 100,
-        disableRangeFallback: true,
+        availableContentWidth: 100,
       }),
-    ).toEqual({ overflow: false });
-    expect(createRange).not.toHaveBeenCalled();
-  });
-
-  it('does not use a Range when Content has no child nodes', () => {
-    const content = document.createElement('span');
-    setScrollWidth(content, 100);
-    const createRange = vi.spyOn(content.ownerDocument, 'createRange');
-
-    expect(
-      measureInlineOverflowWithRange({
-        content,
-        rootContentBoxWidth: 100,
-      }),
-    ).toEqual({ overflow: false });
+    ).toBe(false);
     expect(createRange).not.toHaveBeenCalled();
   });
 });

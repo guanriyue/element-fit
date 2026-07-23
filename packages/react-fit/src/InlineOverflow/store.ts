@@ -117,7 +117,7 @@ export const createInlineOverflowStore = (
       return;
     }
 
-    const nextMeasure = measureInlineOverflowWithRootContentBoxWidth({
+    const nextOverflow = measureInlineOverflowWithRootContentBoxWidth({
       root: rootElement,
       content: contentElement,
       rootContentBoxWidth,
@@ -126,7 +126,7 @@ export const createInlineOverflowStore = (
     const elementsChanged =
       innerData.measuredRootElement !== rootElement ||
       innerData.measuredContentElement !== contentElement;
-    const overflowChanged = overflow !== nextMeasure.overflow;
+    const overflowChanged = overflow !== nextOverflow;
 
     innerData.measuredRootElement = rootElement;
     innerData.measuredContentElement = contentElement;
@@ -134,16 +134,16 @@ export const createInlineOverflowStore = (
     if (typeof rootContentBoxWidth === 'number') {
       lastMeasurement = {
         width: rootContentBoxWidth,
-        overflow: nextMeasure.overflow,
+        overflow: nextOverflow,
       };
     } else {
       lastMeasurement = undefined;
     }
 
-    commitOverflow(nextMeasure.overflow);
+    commitOverflow(nextOverflow);
 
     if (elementsChanged || overflowChanged) {
-      onOverflowChange?.(nextMeasure.overflow);
+      onOverflowChange?.(nextOverflow);
     }
   };
 
