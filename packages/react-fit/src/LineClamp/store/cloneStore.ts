@@ -121,7 +121,7 @@ export const createLineClampCloneStore = (
 ): LineClampStore => {
   const storeState = createLineClampStoreState();
   let lines = initialLines;
-  let rootElement: HTMLSpanElement | null = null;
+  let rootElement: HTMLDivElement | null = null;
   let spacerElement: HTMLSpanElement | null = null;
   let suffixElement: HTMLSpanElement | null = null;
   let rootContentBoxWidth: number | undefined;

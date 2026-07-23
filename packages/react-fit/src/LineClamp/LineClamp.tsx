@@ -5,11 +5,6 @@ import { createLineClampCloneStore } from './store/cloneStore';
 import { createLineClampInPlaceStore } from './store/inPlaceStore';
 import type { LineClampStore } from './store/types';
 
-const LINE_CLAMP_STYLE: React.CSSProperties = {
-  display: 'block',
-  wordBreak: 'break-all',
-};
-
 const LINE_CLAMP_COLLAPSED_STYLE: React.CSSProperties = {
   display: '-webkit-box',
   WebkitBoxOrient: 'vertical',
@@ -51,13 +46,14 @@ const LineClampSpacer = (props: LineClampSpacerProps) => {
 };
 
 export type LineClampMeasureStrategy = 'in-place' | 'clone';
+type LineClampState = 'collapsed' | 'expanded' | 'unclamped';
 
 /**
  * @en Props for LineClamp.
  *
  * @zh LineClamp 的属性。
  */
-export interface LineClampProps extends Omit<React.ComponentPropsWithoutRef<'span'>, 'children'> {
+export interface LineClampProps extends Omit<React.ComponentPropsWithoutRef<'div'>, 'children'> {
   /**
    * @en Inline content clamped by the browser.
    *
@@ -140,11 +136,14 @@ export interface LineClampProps extends Omit<React.ComponentPropsWithoutRef<'spa
 }
 
 /**
- * @en Clamps inline content with the browser's native line-clamp behavior and
- * places a compact suffix according to the controlled expanded state.
+ * @en Renders a div that clamps inline content with the browser's native
+ * line-clamp behavior and places a compact suffix according to the controlled
+ * expanded state. The Root exposes `data-state` as `collapsed`, `expanded`, or
+ * `unclamped`.
  *
- * @zh 使用浏览器原生 line-clamp 能力截断 inline 内容，并在最后一个可见行
- * 的末尾放置紧凑的 suffix，并通过受控的 expanded 状态切换展示方式。
+ * @zh 渲染一个 div，使用浏览器原生 line-clamp 能力截断 inline 内容，并在
+ * 最后一个可见行的末尾放置紧凑的 suffix，通过受控的 expanded 状态切换
+ * 展示方式。Root 的 `data-state` 为 `collapsed`、`expanded` 或 `unclamped`。
  *
  * @example
  * ```tsx
@@ -157,7 +156,7 @@ export interface LineClampProps extends Omit<React.ComponentPropsWithoutRef<'spa
  * </LineClamp>
  * ```
  */
-export const LineClamp = forwardRef<HTMLSpanElement, LineClampProps>((props, forwardedRef) => {
+export const LineClamp = forwardRef<HTMLDivElement, LineClampProps>((props, forwardedRef) => {
   const {
     children,
     expanded = false,
@@ -183,7 +182,14 @@ export const LineClamp = forwardRef<HTMLSpanElement, LineClampProps>((props, for
   );
   const rootRef = useComposedRefs(forwardedRef, store.setRootElement);
   const clampEnabled = typeof lines !== 'undefined' && !expanded;
-  const showSuffix = overflow && typeof suffix !== 'undefined' && suffix !== null;
+  let state: LineClampState = 'unclamped';
+
+  if (typeof lines !== 'undefined') {
+    state = expanded ? 'expanded' : 'collapsed';
+  }
+
+  const showSuffix =
+    typeof lines !== 'undefined' && overflow && typeof suffix !== 'undefined' && suffix !== null;
   const showFloatedSuffix = showSuffix && !expanded;
   const showInlineSuffix = showSuffix && expanded;
 
@@ -200,13 +206,12 @@ export const LineClamp = forwardRef<HTMLSpanElement, LineClampProps>((props, for
   }, [lines, store]);
 
   const rootStyle: React.CSSProperties = {
-    ...LINE_CLAMP_STYLE,
     ...(clampEnabled ? LINE_CLAMP_COLLAPSED_STYLE : undefined),
     ...(clampEnabled ? { WebkitLineClamp: lines } : undefined),
     ...style,
   };
   return (
-    <span {...rootProps} ref={rootRef} style={rootStyle}>
+    <div {...rootProps} data-state={state} ref={rootRef} style={rootStyle}>
       {/* Float layout requires Spacer and Suffix before the content. */}
       {showFloatedSuffix ? <LineClampSpacer store={store} /> : null}
       {showFloatedSuffix ? (
@@ -217,7 +222,7 @@ export const LineClamp = forwardRef<HTMLSpanElement, LineClampProps>((props, for
       {children}
       {/* Expanded layout keeps Suffix in normal inline order after text. */}
       {showInlineSuffix ? <span ref={store.setSuffixElement}>{suffix}</span> : null}
-    </span>
+    </div>
   );
 });
 

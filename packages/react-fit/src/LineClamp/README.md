@@ -5,6 +5,31 @@
 
 组件负责 line-clamp、overflow 测量和 suffix 布局，不内置按钮样式，也不管理展开状态。
 
+## Root 与样式职责
+
+`LineClamp` 的 Root 渲染为 `div`。组件不设置常态下的 `display`、`word-break`、`overflow-wrap`、
+`white-space` 或其他文本样式；开发者可以通过 `className`、`style` 或继承样式决定正文如何换行。
+
+Root 会提供 `data-state`，可用于编写状态样式：
+
+- `collapsed`：`lines` 是正整数，并且 `expanded={false}`。
+- `expanded`：`lines` 是正整数，并且 `expanded={true}`。
+- `unclamped`：`lines` 缺省或不是正整数，截断和测量均被禁用。
+
+为了让组件在没有业务 CSS 时仍能完成核心截断，收起状态仍会内置 `display: -webkit-box`、
+`-webkit-box-orient: vertical`、`overflow: hidden` 和动态的 `-webkit-line-clamp`。Spacer 与 Suffix 的
+float 样式也是末行 suffix 布局的一部分。除此之外的视觉与文本折行策略由开发者控制。
+
+```css
+.description {
+  overflow-wrap: anywhere;
+}
+
+.description[data-state='expanded'] {
+  color: var(--expanded-color);
+}
+```
+
 ## Import
 
 ```tsx
@@ -169,7 +194,7 @@ MutationObserver 不监听 attributes。仅修改 class、style、继承样式�
 加载、CSS 自定义属性变化和仅改变排版规则的主题切换也属于这一范围。需要覆盖这些情况时，开发者应在
 外部保证重新挂载、产生可观察的正文变化，或使用自定义实现。
 
-Root 的 `style` 会在内部样式之后合并。覆盖 `display`、`overflow`、`WebkitLineClamp`、
+Root 的 `style` 会在内部样式之后合并。收起状态下覆盖 `display`、`overflow`、`WebkitLineClamp`、
 `WebkitBoxOrient` 等关键属性可能破坏截断或测量假设。正文应以普通 inline 内容为主；block-level box、
 复杂 bidi/ruby、宽度相关子布局以及较高的 suffix 都可能需要业务侧单独验证。
 

@@ -5,7 +5,7 @@ export const LINE_CLAMP_MUTATION_OPTIONS = {
 } satisfies MutationObserverInit;
 
 export type LineClampMeasureParams = {
-  root: HTMLSpanElement;
+  root: HTMLDivElement;
   contentStartOffset: number;
   contentEndOffset: number;
   lines: number;
@@ -41,7 +41,7 @@ export const canReuseOverflowMeasurement = (
 };
 
 export const getContentOffsets = (
-  root: HTMLSpanElement,
+  root: HTMLDivElement,
   spacer: HTMLSpanElement | null,
   suffix: HTMLSpanElement | null,
 ): ContentOffsets => {
