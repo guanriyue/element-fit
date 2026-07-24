@@ -89,7 +89,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
         maxRows: effectiveMaxRows,
       });
     });
-    const autosizeState = useSyncExternalStore(
+    const autosizeHeight = useSyncExternalStore(
       store.subscribe,
       store.getState,
       store.getState,
@@ -127,11 +127,10 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
         onChange(event);
       }
     };
-    const textareaStyle = autoSizeEnabled && autosizeState !== null
+    const textareaStyle = autoSizeEnabled && autosizeHeight !== null
       ? {
           ...style,
-          height: autosizeState.height,
-          overflowY: autosizeState.overflowY,
+          height: autosizeHeight,
         }
       : style;
 

@@ -1,7 +1,7 @@
 import { configureTextareaMirror } from './configureTextareaMirror.ts';
 import type {
   PreparedTextareaAutosizeMeasure,
-  TextareaAutosizeMeasure,
+  TextareaAutosizeHeight,
   TextareaAutosizeMeasureJob,
   TextareaMirrorPair,
 } from './types.ts';
@@ -74,9 +74,9 @@ export const createTextareaAutosizeMeasureJob = (
   };
 };
 
-export const readTextareaAutosizeMeasure = (
+export const readTextareaAutosizeHeight = (
   job: TextareaAutosizeMeasureJob,
-): TextareaAutosizeMeasure => {
+): TextareaAutosizeHeight => {
   const { minRows, maxRows } = job.request;
   const naturalHeight = toCSSHeight(
     job.mirror.scrollHeight,
@@ -116,8 +116,5 @@ export const readTextareaAutosizeMeasure = (
     }
   }
 
-  return {
-    height: Math.min(maxHeight, Math.max(minHeight, naturalHeight)),
-    overflowY: naturalHeight > maxHeight ? 'auto' : 'hidden',
-  };
+  return Math.min(maxHeight, Math.max(minHeight, naturalHeight));
 };

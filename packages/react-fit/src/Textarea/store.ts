@@ -8,7 +8,7 @@ import { observeElementMutation } from '../_internal/observeElementMutation.ts';
 import { viewportPriorityTaskScheduler } from '../_internal/viewportPriorityTaskScheduler.ts';
 import {
   scheduleTextareaAutosizeMeasure,
-  type TextareaAutosizeMeasure,
+  type TextareaAutosizeHeight,
 } from './measure/index.ts';
 
 const TEXTAREA_VIEWPORT_MARGIN_RATIO = 1;
@@ -35,7 +35,7 @@ const TEXTAREA_RESIZE_OPTIONS = {
 
 type TextareaStoreListener = () => void;
 
-export type TextareaStoreState = TextareaAutosizeMeasure | null;
+export type TextareaStoreState = TextareaAutosizeHeight | null;
 
 export type TextareaStoreOptions = {
   enabled: boolean;
@@ -80,17 +80,8 @@ export const createTextareaStore = (
   };
 
   const commitState = (nextState: TextareaStoreState) => {
-    if (state === null && nextState === null) {
+    if (state === nextState) {
       return;
-    }
-
-    if (state !== null && nextState !== null) {
-      const heightUnchanged = state.height === nextState.height;
-      const overflowUnchanged = state.overflowY === nextState.overflowY;
-
-      if (heightUnchanged && overflowUnchanged) {
-        return;
-      }
     }
 
     state = nextState;
@@ -117,7 +108,7 @@ export const createTextareaStore = (
       measuredElement,
       measuredOptions.minRows,
       measuredOptions.maxRows,
-      (measure) => {
+      (height) => {
         if (
           measureToken !== nextMeasureToken
           || element !== measuredElement
@@ -130,11 +121,11 @@ export const createTextareaStore = (
         measureToken = undefined;
         cancelMeasure = undefined;
 
-        if (measure === null) {
+        if (height === null) {
           return;
         }
 
-        commitState(measure);
+        commitState(height);
       },
     );
   };

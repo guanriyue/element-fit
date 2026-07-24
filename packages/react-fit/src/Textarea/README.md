@@ -1,7 +1,8 @@
 # Textarea
 
 `Textarea` 在原生 `<textarea>` 的基础上提供可选的自动高度能力。未启用 `autoSize` 时，组件保持
-原生 textarea 的尺寸行为；启用后，组件根据内容和可用宽度计算高度，并可以通过行数限制保留纵向滚动。
+原生 textarea 的尺寸行为；启用后，组件根据内容和可用宽度计算高度。滚动、裁切和 resize 策略由调用方
+通过 CSS 控制。
 
 ## Import
 
@@ -24,8 +25,15 @@ import { Textarea } from '@guanriyue/react-fit/textarea';
 `minRows` 和 `maxRows` 只接受正整数。两者同时存在且 `maxRows` 小于 `minRows` 时，组件会把
 `maxRows` 收敛到 `minRows`。
 
-达到 `maxRows` 之前，组件使用 `overflowY: hidden`；内容超过最大行数后，高度不再继续增长，并切换为
-`overflowY: auto`。
+达到 `maxRows` 后，高度不再继续增长。组件不会修改 `overflowY`；需要保留纵向滚动时，应由调用方设置
+`overflow-y: auto`。
+
+```tsx
+<Textarea
+  autoSize={{ minRows: 2, maxRows: 6 }}
+  style={{ overflowY: 'auto' }}
+/>
+```
 
 ## rows
 
@@ -107,11 +115,21 @@ near 任务优先进入共享 Textarea layout task；far 任务通过 idle batch
 
 ## 样式行为
 
-启用 `autoSize` 且完成首次测量后，组件会在调用方 `style` 之后写入测量得到的 `height` 和
-`overflowY`。其他原生属性、事件和样式继续传递给 textarea。
+启用 `autoSize` 且完成首次测量后，组件只会在调用方 `style` 之后写入测量得到的 `height`。
+`overflowY`、`resize` 和其他原生属性、事件及样式继续由调用方控制。
 
-未启用 `autoSize` 或切换回 `autoSize={false}` 时，组件不再接管这两个属性，恢复调用方提供的样式和
-原生 textarea 尺寸行为。
+未启用 `autoSize` 或切换回 `autoSize={false}` 时，组件不再接管 `height`，恢复调用方提供的样式和
+原生 textarea 尺寸行为。无论是否启用自动高度，组件都不会根据 `maxRows` 修改 overflow 样式。
+
+```css
+.textarea-scroll {
+  overflow-y: auto;
+}
+
+.textarea-clip {
+  overflow-y: clip;
+}
+```
 
 自动高度模式下，手动拖动纵向 resize 手柄得到的高度可能在下一次测量时被覆盖。需要稳定的自动高度
 界面时，可以设置 `resize: none`，或者只允许横向 resize。

@@ -1,34 +1,20 @@
 /**
- * @en The autosize layout result committed to the Textarea store.
+ * @en The autosize height committed to the Textarea store.
  *
- * @zh 提交到 Textarea store 的自动高度布局结果。
+ * @zh 提交到 Textarea store 的自动高度。
  */
-export type TextareaAutosizeMeasure = {
-  /**
-   * @en The CSS height that should be applied to the source Textarea.
-   *
-   * @zh 应当应用到原始 Textarea 的 CSS 高度。
-   */
-  height: number;
-
-  /**
-   * @en The vertical overflow mode derived from the maxRows constraint.
-   *
-   * @zh 根据 maxRows 约束推导出的纵向溢出模式。
-   */
-  overflowY: 'auto' | 'hidden';
-};
+export type TextareaAutosizeHeight = number;
 
 /**
- * @en Receives the completed autosize result and the measured source width.
+ * @en Receives the completed autosize height and the measured source width.
  *
- * @zh 接收已完成的自动高度结果以及测量时的原始节点宽度。
+ * @zh 接收已完成的自动高度以及测量时的原始节点宽度。
  *
- * @param measure - The result, or null when the source cannot be measured.
+ * @param height - The height, or null when the source cannot be measured.
  * @param borderBoxInlineSize - The measured border-box inline size.
  */
 export type TextareaAutosizeMeasureListener = (
-  measure: TextareaAutosizeMeasure | null,
+  height: TextareaAutosizeHeight | null,
   borderBoxInlineSize: number,
 ) => void;
 

@@ -5,11 +5,11 @@ import { getTextareaMeasureContainer } from './getTextareaMeasureContainer.ts';
 import { prepareTextareaAutosizeMeasure } from './prepareTextareaAutosizeMeasure.ts';
 import {
   createTextareaAutosizeMeasureJob,
-  readTextareaAutosizeMeasure,
+  readTextareaAutosizeHeight,
 } from './textareaAutosizeMeasureJob.ts';
 import type {
   PreparedTextareaAutosizeMeasure,
-  TextareaAutosizeMeasure,
+  TextareaAutosizeHeight,
   TextareaAutosizeMeasureJob,
   TextareaAutosizeMeasureListener,
   TextareaAutosizeMeasureRequest,
@@ -35,7 +35,7 @@ type MeasureJob = {
 };
 
 type MeasuredResult = MeasureJob & {
-  measure: TextareaAutosizeMeasure;
+  height: TextareaAutosizeHeight;
 };
 
 type OwnedMirrors = {
@@ -239,7 +239,7 @@ export const createTextareaAutosizeLayoutTaskPlan = (
             try {
               measuredResults.push({
                 ...measureJob,
-                measure: readTextareaAutosizeMeasure(measureJob.job),
+                height: readTextareaAutosizeHeight(measureJob.job),
               });
             } catch (error) {
               failedRequests.add(measureJob.taskRequest);
@@ -249,7 +249,7 @@ export const createTextareaAutosizeLayoutTaskPlan = (
         },
         write: () => {
           for (const measuredResult of measuredResults) {
-            const { taskRequest, job, measure } = measuredResult;
+            const { taskRequest, job, height } = measuredResult;
 
             if (taskRequest.cancelled) {
               continue;
@@ -258,7 +258,7 @@ export const createTextareaAutosizeLayoutTaskPlan = (
             taskRequest.completed = true;
 
             try {
-              taskRequest.listener(measure, job.borderBoxInlineSize);
+              taskRequest.listener(height, job.borderBoxInlineSize);
             } catch (error) {
               reportTaskError(error);
             }
