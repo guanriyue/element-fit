@@ -6,7 +6,7 @@ pageType: doc-wide
 
 # Textarea
 
-`Textarea` 在原生 `<textarea>` 的基础上提供可选的自动高度能力。未启用 `autoSize` 时，它保持原生 textarea 的尺寸行为；启用后，组件会根据内容和可用宽度重新计算高度，并可通过行数限制保留滚动能力。
+`Textarea` 在原生 `<textarea>` 的基础上提供可选的自动高度能力。未启用 `autoSize` 时，它保持原生 textarea 的尺寸行为；启用后，组件会根据内容和可用宽度重新计算高度。滚动、裁切和 resize 策略由开发者控制。
 
 ## 导入
 
@@ -16,7 +16,7 @@ import { Textarea } from '@guanriyue/react-fit/textarea';
 
 ## 基础用法
 
-下面的示例可以切换 `autoSize` 的三种主要配置，并调整 `rows`、`minRows` 和 `maxRows`。修改内容或拖动容器宽度，可以观察换行变化后的重新测量。
+下面的示例可以切换 `autoSize` 的三种主要配置，调整 `rows`、`minRows` 和 `maxRows`，并选择 `overflow-y` 策略。修改内容或拖动容器宽度，可以观察换行变化后的重新测量。
 
 ```tsx file="<root>/src/demos/textarea/basic.tsx" preview
 
@@ -24,19 +24,22 @@ import { Textarea } from '@guanriyue/react-fit/textarea';
 
 ## 自动高度模式
 
-传入 `autoSize` 会启用不限制行数的自动高度。Textarea 会随着内容增加继续增高，不主动产生纵向滚动条。
+传入 `autoSize` 会启用不限制行数的自动高度。Textarea 会随着内容增加继续增高，组件本身不修改纵向 overflow 样式。
 
 ```tsx
 <Textarea autoSize />
 ```
 
-需要限制伸缩范围时，向 `autoSize` 传入 `minRows` 和 `maxRows`。内容少于最低行数时保留最低高度；超过最高行数后高度不再增加，并允许内容区域纵向滚动。
+需要限制伸缩范围时，向 `autoSize` 传入 `minRows` 和 `maxRows`。内容少于最低行数时保留最低高度；超过最高行数后高度不再增加。是否允许纵向滚动由 `overflow-y` 决定。
 
 ```tsx
-<Textarea autoSize={{ minRows: 2, maxRows: 6 }} />
+<Textarea
+  autoSize={{ minRows: 2, maxRows: 6 }}
+  style={{ overflowY: 'auto' }}
+/>
 ```
 
-不传 `autoSize` 或显式传入 `false` 时，组件不会接管 `height` 和 `overflowY`，`rows`、CSS 高度及浏览器原生 resize 行为照常生效。
+不传 `autoSize` 或显式传入 `false` 时，组件不会接管 `height`，`rows`、CSS 高度及浏览器原生 resize 行为照常生效。`overflowY` 在任何模式下都由开发者控制。
 
 ```tsx
 <Textarea rows={4} />
@@ -88,8 +91,8 @@ const [value, setValue] = useState('');
 
 ## 样式与边界
 
-- 自动高度只接管行内 `height` 和 `overflowY`，其他原生属性、事件和样式会继续传递给 textarea。
-- 达到 `maxRows` 后，`overflowY` 会变为 `auto`；未达到上限时为 `hidden`。
+- 自动高度只接管行内 `height`，其他原生属性、事件和样式会继续传递给 textarea。
+- 组件不会设置 `overflowY`。可以使用 `auto` 保留超出 `maxRows` 后的滚动能力，也可以根据业务需要使用 `hidden`、`clip` 或 `scroll`。
 - 首次客户端测量完成前，Textarea 使用原生 `rows` 和调用方样式计算初始高度，随后再提交自动高度。
 - 组件会响应宽度变化，不会根据父容器高度推导 Textarea 高度。
 - 自动高度模式下手动拖动纵向 resize 手柄得到的高度可能在下一次测量时被覆盖。需要稳定的自动高度界面时，通常应设置 `resize: none`，或只允许横向 resize。
