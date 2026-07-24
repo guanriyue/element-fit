@@ -1,4 +1,7 @@
-import { LineClamp, type LineClampMeasureStrategy } from '@guanriyue/react-fit/line-clamp';
+import {
+  LineClamp,
+  type LineClampMeasureStrategy,
+} from '@guanriyue/react-fit/line-clamp';
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -16,10 +19,15 @@ export type LineClampPreviewProps = {
   measureStrategy?: LineClampMeasureStrategy;
   onOverflowChange?: (overflow: boolean) => void;
   onToggle: () => void;
+  rootClassName?: string;
   suffix?: ReactNode;
 };
 
-export const ToggleSuffix = (props: { expanded: boolean; onToggle: () => void; children?: ReactNode }) => {
+export const ToggleSuffix = (props: {
+  children?: ReactNode;
+  expanded: boolean;
+  onToggle: () => void;
+}) => {
   const { children, expanded, onToggle } = props;
 
   return (
@@ -54,17 +62,26 @@ export const LineClampPreview = (props: LineClampPreviewProps) => {
     measureStrategy,
     onOverflowChange,
     onToggle,
+    rootClassName,
     suffix,
   } = props;
 
   return (
-    <div className={cn('w-full min-w-0 rounded-md border bg-background p-4 text-sm leading-7', className)}>
+    <div
+      className={cn(
+        'w-full min-w-0 rounded-md border bg-background p-4 text-sm leading-7',
+        className,
+      )}
+    >
       <LineClamp
+        className={rootClassName}
         expanded={expanded}
         lines={lines}
         measureStrategy={measureStrategy}
         onOverflowChange={onOverflowChange}
-        suffix={suffix ?? <ToggleSuffix expanded={expanded} onToggle={onToggle} />}
+        suffix={
+          suffix ?? <ToggleSuffix expanded={expanded} onToggle={onToggle} />
+        }
       >
         {children}
       </LineClamp>

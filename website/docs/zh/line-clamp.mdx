@@ -16,7 +16,7 @@ import { LineClamp } from '@guanriyue/react-fit/line-clamp';
 
 ## 基础用法
 
-`expanded` 是受控状态。修改 `expanded` 只改变当前视觉展示，不会改变 `lines` 这个测量基准。
+`expanded` 是受控状态。修改 `expanded` 只改变当前视觉展示，不会改变 `lines` 这个测量基准。下面的示例可以调整容器宽度和行数，并切换 clamp 与 expanded 状态，直接观察 `collapsed`、`expanded` 和 `unclamped`。
 
 ```tsx file="<root>/src/demos/line-clamp/basic.tsx" preview
 
@@ -25,8 +25,9 @@ import { LineClamp } from '@guanriyue/react-fit/line-clamp';
 ## 样式控制与 data-state
 
 Root 渲染为 `div`。组件不设置常态下的 `display`、`word-break`、`overflow-wrap` 或 `white-space`，正文的
-换行规则和视觉样式由开发者通过 `className`、`style` 或继承样式控制。下面的示例可以切换是否使用
-`word-break: break-all`，并通过 `data-[state=...]` 属性选择器为收起和展开状态设置不同颜色。
+换行规则和视觉样式由开发者通过 `className`、`style` 或继承样式控制。下面同时挂载普通换行与
+`word-break: break-all` 两组实例，并通过 `data-[state=...]` 属性选择器为收起和展开状态设置不同颜色。
+两组实例共享宽度、行数和 expanded 状态，只有换行策略不同。
 
 ```tsx file="<root>/src/demos/line-clamp/style-control.tsx" preview
 
@@ -45,7 +46,7 @@ Root 的 `data-state` 有三个值：
 
 ## Overflow 状态
 
-`onOverflowChange` 会在首次可信测量完成后触发，并在测得的 overflow 状态变化时再次触发。这里的 overflow 表示内容超过 `lines` 基准，不表示展开后的当前 UI 正在被裁切。组件会监听内容变化，下面的示例可以通过 textarea 输入或一键切换长短文本来观察重新测量。
+`onOverflowChange` 会在首次可信测量完成后触发，并在测得的 overflow 状态变化时再次触发。这里的 overflow 表示内容超过 `lines` 基准，不表示展开后的当前 UI 正在被裁切。组件会监听内容变化，下面的示例可以通过 textarea 输入或一键切换长短文本来观察重新测量，也可以调整宽度和行数改变测量基准。
 
 ```tsx file="<root>/src/demos/line-clamp/overflow-state.tsx" preview
 
@@ -53,7 +54,7 @@ Root 的 `data-state` 有三个值：
 
 ## Inline 内容
 
-`LineClamp` 接收 `children`，因此可以承载文本、链接、强调、`code`、`inline-block` 和 `<br />` 等 inline 内容。复杂 inline box、强制换行和不同浏览器的 Range rect 可能带来边界差异。
+`LineClamp` 接收 `children`，因此可以承载文本、链接、强调、`code`、`inline-block` 和 `<br />` 等 inline 内容。下面的示例可以条件渲染不同类型的 inline 节点，产生真实的正文 DOM mutation。复杂 inline box、强制换行和不同浏览器的 Range rect 可能带来边界差异。
 
 ```tsx file="<root>/src/demos/line-clamp/inline-content.tsx" preview
 
@@ -61,7 +62,7 @@ Root 的 `data-state` 有三个值：
 
 ## 测量策略
 
-默认策略是 `in-place`，它直接读取当前 DOM 的行信息，不创建额外测量节点。`clone` 会临时克隆正文内容到隔离 DOM 中重新排版，代价是额外布局，但可以避开部分可见 suffix 对测量的干扰。
+默认策略是 `in-place`，它直接读取当前 DOM 的行信息，不创建额外测量节点。`clone` 会临时克隆正文内容到隔离 DOM 中重新排版，代价是额外布局，但可以避开部分可见 suffix 对测量的干扰。下面两组实例共享宽度、行数、内容和 expanded 状态，唯一差异是测量策略。
 
 ```tsx file="<root>/src/demos/line-clamp/measure-strategy.tsx" preview
 
@@ -69,7 +70,7 @@ Root 的 `data-state` 有三个值：
 
 ## Suffix 形态
 
-收起状态下 suffix 会通过 float 布局放到最后一个可见行附近。它可以是提示、详情、跳转或展开入口，不必总是控制 `expanded`；也可以把提示和展开控制组合在同一个按钮上。suffix 应该保持紧凑，建议高度不超过一行；较长或较高的 suffix 会参与最后一行排版，可能挤压正文。
+收起状态下 suffix 会通过 float 布局放到最后一个可见行附近。它可以是提示、详情、跳转或展开入口，不必总是控制 `expanded`；也可以把提示和展开控制组合在同一个按钮上。示例可以切换长短 suffix，观察它对最后一行正文空间的影响。suffix 应该保持紧凑，建议高度不超过一行；较长或较高的 suffix 会参与最后一行排版，可能挤压正文。
 
 ```tsx file="<root>/src/demos/line-clamp/suffix.tsx" preview
 
@@ -81,4 +82,5 @@ Root 的 `data-state` 有三个值：
 - suffix 仅在测量结果为 overflow 时渲染。
 - 收起状态下 suffix 使用 float 影响最后一行布局；展开状态下 suffix 回到正文之后的普通 inline 位置。
 - 组件会监听内容变化，并在正文文本或子节点变化后重新测量；Root content box width 或 `lines` 变化时也会重新测量。
+- MutationObserver 不监听 attributes。仅修改 class、style、继承样式、字体或外部样式表时，如果 Root content box width 没有变化，也没有正文 DOM mutation，不保证重新测量。
 - `in-place` 当前只识别 `<br />` 形成的 hard line break；其他 CSS 或文本规则形成的强制换行可能需要改用 `clone` 或自定义方案。

@@ -1,9 +1,17 @@
-import { LineClamp, type LineClampMeasureStrategy } from '@guanriyue/react-fit/line-clamp';
+import {
+  LineClamp,
+  type LineClampMeasureStrategy,
+} from '@guanriyue/react-fit/line-clamp';
 import { useState } from 'react';
 import { DemoBox } from '@/components/custom/demo-box';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { OverflowBadge, ToggleSuffix } from '@/demos/line-clamp/shared';
 
 type StrategyPreviewProps = {
+  expanded: boolean;
+  lines: number;
+  onToggle: () => void;
   strategy: LineClampMeasureStrategy;
 };
 
@@ -22,15 +30,14 @@ const content = (
 );
 
 const StrategyPreview = (props: StrategyPreviewProps) => {
-  const { strategy } = props;
-  const [expanded, setExpanded] = useState(false);
+  const { expanded, lines, onToggle, strategy } = props;
   const [overflow, setOverflow] = useState(false);
 
   return (
     <div className="w-full min-w-0 space-y-2">
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm font-medium text-muted-foreground">
-          {strategy === 'in-place' ? 'in-place' : 'clone'}
+          {strategy}
         </div>
         <OverflowBadge overflow={overflow} />
       </div>
@@ -38,17 +45,10 @@ const StrategyPreview = (props: StrategyPreviewProps) => {
       <div className="w-full min-w-0 rounded-md border bg-background p-4 text-sm leading-7">
         <LineClamp
           expanded={expanded}
-          lines={3}
+          lines={lines}
           measureStrategy={strategy}
           onOverflowChange={setOverflow}
-          suffix={(
-            <ToggleSuffix
-              expanded={expanded}
-              onToggle={() => {
-                setExpanded((value) => !value);
-              }}
-            />
-          )}
+          suffix={<ToggleSuffix expanded={expanded} onToggle={onToggle} />}
         >
           {content}
         </LineClamp>
@@ -58,11 +58,54 @@ const StrategyPreview = (props: StrategyPreviewProps) => {
 };
 
 const LineClampMeasureStrategyDemo = () => {
+  const [expanded, setExpanded] = useState(false);
+  const [lines, setLines] = useState(3);
+
+  const handleToggle = () => {
+    setExpanded((value) => !value);
+  };
+
   return (
-    <DemoBox widthControl defaultWidth={560} minWidth={200} maxWidth={820}>
-      <div className="w-full min-w-0 space-y-4">
-        <StrategyPreview strategy="in-place" />
-        <StrategyPreview strategy="clone" />
+    <DemoBox defaultWidth={560} minWidth={200} maxWidth={820} widthStep={1}>
+      <div className="space-y-5 p-6">
+        <DemoBox.Controls>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <DemoBox.WidthSlider sliderClassName="w-56" />
+            <DemoBox.Slider
+              label="行数"
+              min={1}
+              max={6}
+              step={1}
+              value={lines}
+              onValueChange={setLines}
+              sliderClassName="w-56"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 border-t pt-4">
+            <Switch
+              id="line-clamp-strategy-expanded"
+              checked={expanded}
+              onCheckedChange={setExpanded}
+            />
+            <Label htmlFor="line-clamp-strategy-expanded">expanded</Label>
+          </div>
+        </DemoBox.Controls>
+
+        <DemoBox.Preview className="space-y-4">
+          <StrategyPreview
+            strategy="in-place"
+            expanded={expanded}
+            lines={lines}
+            onToggle={handleToggle}
+          />
+          <StrategyPreview
+            strategy="clone"
+            expanded={expanded}
+            lines={lines}
+            onToggle={handleToggle}
+          />
+        </DemoBox.Preview>
       </div>
     </DemoBox>
   );
