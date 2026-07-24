@@ -27,5 +27,34 @@
         "link": "/textarea"
       }
     ]
+  },
+  {
+    "text": "压力测试",
+    "items": [
+      {
+        "text": "CompactGrid",
+        "link": "/stress/compact-grid"
+      },
+      {
+        "text": "FitSwitch",
+        "link": "/stress/fit-switch"
+      },
+      {
+        "text": "InlineOverflow",
+        "link": "/stress/inline-overflow"
+      },
+      {
+        "text": "LineClamp",
+        "link": "/stress/line-clamp"
+      },
+      {
+        "text": "Textarea",
+        "link": "/stress/textarea"
+      },
+      {
+        "text": "综合业务场景",
+        "link": "/stress/real-world"
+      }
+    ]
   }
 ]

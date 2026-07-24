@@ -1,0 +1,13 @@
+---
+description: InlineOverflow 大量实例下的测量性能观测页面。
+outline: false
+pageType: doc-wide
+---
+
+import { InlineOverflowStressTest } from '@/stress-tests/inline-overflow';
+
+# InlineOverflow 压力测试
+
+页面可以渲染 20、50、100、200、300 或 500 个实例，并在 `InlineOverflow` 与 CSS 单行省略基线之间切换。可以批量改变 Content、容器宽度或重新挂载全部实例，观察集中测量时的 FPS 变化。宽度动画默认关闭，可以按需开启以观察 CSS transition 持续触发测量时的表现。
+
+<InlineOverflowStressTest />

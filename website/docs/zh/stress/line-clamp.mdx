@@ -1,0 +1,13 @@
+---
+description: LineClamp 大量实例下的测量性能观测页面。
+outline: false
+pageType: doc-wide
+---
+
+import { LineClampStressTest } from '@/stress-tests/line-clamp';
+
+# LineClamp 压力测试
+
+页面可以渲染 20、50、100、200、300 或 500 个实例，并在 `LineClamp` 与 CSS `line-clamp` 基线之间切换。可以批量改变文本、展开状态和容器宽度，观察集中测量时的 FPS 变化；测量策略只对组件模式生效。
+
+<LineClampStressTest />

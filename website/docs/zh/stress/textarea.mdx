@@ -1,0 +1,13 @@
+---
+description: Textarea 大量实例下的自动高度测量性能观测页面。
+outline: false
+pageType: doc-wide
+---
+
+import { TextareaStressTest } from '@/stress-tests/textarea';
+
+# Textarea 压力测试
+
+页面可以渲染 20、50、100、200、300 或 500 个实例，并在启用 `autoSize` 的 `Textarea` 与 CSS `field-sizing: content` 基线之间切换。可以批量改变受控内容、容器宽度或重新挂载实例，观察自动高度测量时的 FPS 变化。CSS 基线的效果取决于当前浏览器对 `field-sizing` 的支持。
+
+<TextareaStressTest />

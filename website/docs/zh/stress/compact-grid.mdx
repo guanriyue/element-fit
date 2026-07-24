@@ -1,0 +1,13 @@
+---
+description: CompactGrid 大量实例下的测量性能观测页面。
+outline: false
+pageType: doc-wide
+---
+
+import { CompactGridStressTest } from '@/stress-tests/compact-grid';
+
+# CompactGrid 压力测试
+
+页面可以渲染 20、50、100、200、300 或 500 个实例，并在 `CompactGrid` 与普通 CSS Grid 基线之间切换。可以批量改变 Item 数量或容器宽度，观察列数和紧凑状态重新计算时的 FPS 变化。CSS 基线中的额外操作作为普通 grid item 渲染，不模拟 `ExtraSlot` 的内容移动。
+
+<CompactGridStressTest />

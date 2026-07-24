@@ -1,0 +1,13 @@
+---
+description: 多种自适应组件共同运行时的综合业务压力测试页面。
+outline: false
+pageType: doc-wide
+---
+
+import { RealWorldStressTest } from '@/stress-tests/real-world';
+
+# 综合业务场景
+
+这个页面模拟一个订单管理后台，同时使用 `CompactGrid`、`InlineOverflow`、`LineClamp` 和 `FitSwitch`，并支持整体切换到 CSS 基线。表格可以渲染 20、50、100、200、300 或 500 行，并且有意不使用虚拟列表，以便让所有实例保持挂载；它用于性能观测，不代表生产环境中的大列表实现建议。
+
+<RealWorldStressTest />
