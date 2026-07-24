@@ -22,31 +22,9 @@ Root 和 Content 都不提供默认样式。调用方需要让 Root 形成可测
 
 ### 展示策略由调用方控制
 
-下面两个实例使用相同的测量结构，但分别选择 ellipsis 和 clip。`InlineOverflow` 只负责报告横向 overflow，不会覆盖 Content 的 `white-space`、`overflow` 或 `text-overflow`。
+下面的示例可以调整容器宽度、Root padding、文本内容以及 ellipsis / clip 裁剪策略。`InlineOverflow` 只负责报告横向 overflow，不会覆盖 Content 的 `white-space`、`overflow` 或 `text-overflow`。
 
 ```tsx file="<root>/src/demos/inline-overflow/style-strategies.tsx" preview
-
-```
-
-## 宽容器
-
-在 ellipsis 的临界位置，浏览器可能已经绘制省略号，但 JavaScript 读取到的 `clientWidth` 和 `scrollWidth` 仍然相等。此时使用 `scrollWidth > clientWidth` 的普通判断会得到“未溢出”，从而漏掉已经出现的省略。这个浏览器平台问题可以参考 CSSWG 的 [issue #4123](https://github.com/w3c/csswg-drafts/issues/4123)。
-
-组件会对这类边界情况做额外校正。下面两组内容、布局和宽度完全一致，用于对比“启用边界校正”和“关闭边界校正”时的判定差异。校正使用 Content 的 Range bounding rect 补充整数精度的 `scrollWidth`；它适合普通单行 flow，但不等价于任意 DOM 子树的 intrinsic width。
-
-> 静态截图：下图用于展示边界校正可能带来的判定差异，不是可交互 demo。这个现象只在极限边界情况下才可能复现，通常需要多次调整文本或宽度。下面的 preview 示例可以用于本地继续观察。
-
-![启用边界校正和关闭边界校正时的 ellipsis 判定对比](/inline-overflow-range-diff.png)
-
-下面是可交互 demo：
-
-```tsx file="<root>/src/demos/inline-overflow/wide.tsx" preview
-
-```
-
-## 窄容器
-
-```tsx file="<root>/src/demos/inline-overflow/narrow.tsx" preview
 
 ```
 
@@ -98,15 +76,31 @@ Root、Content 和 Accessory 都支持 `asChild`。组件会把 ref、状态属�
 
 这种形式适合只需要 overflow 状态或 `data-overflow` 的紧凑结构。需要组合 Accessory 时，建议继续使用分离的 Root 和 Content，避免 Accessory 进入 Content 的测量子树。
 
-## 多个 Inline 节点
+## Ellipsis 边界校正
+
+在 ellipsis 的临界位置，浏览器可能已经绘制省略号，但 JavaScript 读取到的 `clientWidth` 和 `scrollWidth` 仍然相等。此时使用 `scrollWidth > clientWidth` 的普通判断会得到“未溢出”，从而漏掉已经出现的省略。这个浏览器平台问题可以参考 CSSWG 的 [issue #4123](https://github.com/w3c/csswg-drafts/issues/4123)。
+
+组件会对这类边界情况做额外校正。下面两组内容、布局和宽度完全一致，用于对比“启用边界校正”和“关闭边界校正”时的判定差异。校正使用 Content 的 Range bounding rect 补充整数精度的 `scrollWidth`；它适合普通单行 flow，但不等价于任意 DOM 子树的 intrinsic width。
+
+> 静态截图：下图用于展示边界校正可能带来的判定差异，不是可交互 demo。这个现象只在极限边界情况下才可能复现，通常需要多次调整文本或宽度。下面的 preview 示例可以用于本地继续观察。
+
+![启用边界校正和关闭边界校正时的 ellipsis 判定对比](/inline-overflow-range-diff.png)
+
+下面是可交互 demo，可使用 1px 步进的宽度控制尝试命中临界位置：
+
+```tsx file="<root>/src/demos/inline-overflow/wide.tsx" preview
+
+```
+
+## 多个 Inline 节点的边界校正
 
 下面示例包含 `inline-block` 和 `inline-flex` 节点。Range 会包含普通 flow 中被选中的文本和顶层元素 border area，但 margin、伪元素、定位和 transform 等不属于可靠测量范围。两组内容、布局和宽度保持一致，用于观察此类内容在“启用边界校正”和“关闭边界校正”时的结果。
 
-> 静态截图：下图用于展示多个 inline 节点场景下的对比效果，不是可交互 demo。下面的 preview 示例可以用于本地继续观察。
+> 静态截图：下图用于展示多个 inline 节点场景下的对比效果，不是可交互 demo。这个现象同样只在极限边界情况下才可能复现。下面的 preview 示例可以用于本地继续观察。
 
 ![多个 inline 节点在启用边界校正和关闭边界校正时的对比](/inline-overflow-inline-nodes-diff.png)
 
-下面是可交互 demo：
+下面是可交互 demo，可使用 1px 步进的宽度控制尝试命中临界位置：
 
 ```tsx file="<root>/src/demos/inline-overflow/inline-nodes.tsx" preview
 

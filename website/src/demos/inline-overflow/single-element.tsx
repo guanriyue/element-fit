@@ -1,29 +1,61 @@
 import { InlineOverflow } from '@guanriyue/react-fit/inline-overflow';
 import { type ChangeEvent, useState } from 'react';
 import { DemoBox } from '@/components/custom/demo-box';
-import { Slider } from '@/components/ui/slider';
-import { Switch } from '@/components/ui/switch';
-import { cn } from '@/lib/utils';
+import { Label } from '@/components/ui/label';
 
 const defaultText = 'InlineOverflow single element with inline padding';
 
 const InlineOverflowSingleElementDemo = () => {
   const [text, setText] = useState(defaultText);
-  const [width, setWidth] = useState(320);
-  const [paddingEnabled, setPaddingEnabled] = useState(true);
+  const [paddingInline, setPaddingInline] = useState(16);
+  const [paddingBlock, setPaddingBlock] = useState(12);
   const [overflow, setOverflow] = useState(false);
 
   const handleTextChange = (event: ChangeEvent<HTMLInputElement>) => {
     setText(event.target.value);
   };
 
-  const handleWidthChange = (nextValue: number[]) => {
-    setWidth(nextValue[0] ?? width);
-  };
-
   return (
-    <DemoBox>
-      <div className="space-y-4 p-6">
+    <DemoBox defaultWidth={320} minWidth={120} maxWidth={480} widthStep={1}>
+      <div className="space-y-5 p-6">
+        <DemoBox.Controls>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <DemoBox.WidthSlider label="元素宽度" sliderClassName="w-56" />
+            <DemoBox.Slider
+              label="inline padding"
+              min={0}
+              max={32}
+              step={1}
+              value={paddingInline}
+              onValueChange={setPaddingInline}
+              valueFormatter={(value) => `${value}px`}
+              sliderClassName="w-56"
+            />
+            <DemoBox.Slider
+              label="block padding"
+              min={0}
+              max={20}
+              step={1}
+              value={paddingBlock}
+              onValueChange={setPaddingBlock}
+              valueFormatter={(value) => `${value}px`}
+              sliderClassName="w-56"
+            />
+          </div>
+
+          <div className="space-y-1.5 border-t pt-4">
+            <Label htmlFor="inline-overflow-single-element-text">
+              示例文本
+            </Label>
+            <input
+              id="inline-overflow-single-element-text"
+              value={text}
+              onChange={handleTextChange}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none transition-[border-color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            />
+          </div>
+        </DemoBox.Controls>
+
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-sm font-medium">单元素模式</div>
@@ -36,65 +68,16 @@ const InlineOverflowSingleElementDemo = () => {
           </div>
         </div>
 
-        <div className="max-w-full" style={{ width }}>
+        <DemoBox.Preview>
           <InlineOverflow asChild onOverflowChange={setOverflow}>
             <InlineOverflow.Content
-              className={cn(
-                'box-border block w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-md border bg-background text-sm data-overflow:border-primary',
-                paddingEnabled && 'px-4 py-3',
-              )}
+              className="box-border block w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-md border bg-background text-sm data-overflow:border-primary"
+              style={{ paddingInline, paddingBlock }}
             >
               {text}
             </InlineOverflow.Content>
           </InlineOverflow>
-        </div>
-
-        <div className="flex items-center justify-between gap-3">
-          <label
-            htmlFor="inline-overflow-single-element-padding"
-            className="text-sm font-medium"
-          >
-            启用 padding
-          </label>
-          <Switch
-            id="inline-overflow-single-element-padding"
-            checked={paddingEnabled}
-            onCheckedChange={setPaddingEnabled}
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <label
-            htmlFor="inline-overflow-single-element-width"
-            className="flex justify-between text-sm font-medium"
-          >
-            <span>元素宽度</span>
-            <span>{width}px</span>
-          </label>
-          <Slider
-            id="inline-overflow-single-element-width"
-            min={120}
-            max={480}
-            value={[width]}
-            onValueChange={handleWidthChange}
-            className="w-full"
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <label
-            htmlFor="inline-overflow-single-element-text"
-            className="text-sm font-medium"
-          >
-            示例文本
-          </label>
-          <input
-            id="inline-overflow-single-element-text"
-            value={text}
-            onChange={handleTextChange}
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none transition-[border-color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-          />
-        </div>
+        </DemoBox.Preview>
       </div>
     </DemoBox>
   );

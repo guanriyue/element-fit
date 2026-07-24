@@ -2,6 +2,7 @@ import { InlineOverflow } from '@guanriyue/react-fit/inline-overflow';
 import { type ChangeEvent, useState } from 'react';
 import { DemoBox } from '@/components/custom/demo-box';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import {
   Tooltip,
   TooltipContent,
@@ -16,16 +17,42 @@ const InlineOverflowAccessorySeparateRowDemo = () => {
   const [text, setText] = useState(defaultText);
   const [overflow, setOverflow] = useState(false);
   const [tooltipOpen, setTooltipOpen] = useState(false);
+
   const handleTextChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
     setText(event.target.value);
   };
+
   const handleTooltipOpenChange = (nextOpen: boolean) => {
     setTooltipOpen(overflow && nextOpen);
   };
 
   return (
-    <DemoBox>
-      <div className="space-y-4 p-6">
+    <DemoBox defaultWidth={340} minWidth={180} maxWidth={720} widthStep={1}>
+      <div className="space-y-5 p-6">
+        <DemoBox.Controls>
+          <DemoBox.WidthSlider sliderClassName="w-56" />
+
+          <div className="space-y-1.5 border-t pt-4">
+            <Label htmlFor="inline-overflow-accessory-separate-row-text">
+              示例文本
+            </Label>
+            <textarea
+              id="inline-overflow-accessory-separate-row-text"
+              aria-describedby="inline-overflow-accessory-separate-row-text-description"
+              value={text}
+              onChange={handleTextChange}
+              className="min-h-20 w-full resize-y rounded-md border bg-background px-3 py-2 text-sm outline-none transition-[border-color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            />
+            <div
+              id="inline-overflow-accessory-separate-row-text-description"
+              className="text-xs text-muted-foreground"
+            >
+              修改文本和宽度，观察 Accessory 在第二行随 overflow
+              状态显示或隐藏。
+            </div>
+          </div>
+        </DemoBox.Controls>
+
         <div className="flex items-center justify-between gap-3">
           <div className="text-sm font-medium text-muted-foreground">
             Accessory 单独一行
@@ -35,7 +62,7 @@ const InlineOverflowAccessorySeparateRowDemo = () => {
           </div>
         </div>
 
-        <div className="w-[340px] max-w-full min-w-0 rounded-md border bg-background p-3">
+        <DemoBox.Preview className="rounded-md border bg-background p-3">
           <TooltipProvider>
             <Tooltip
               open={overflow && tooltipOpen}
@@ -73,29 +100,7 @@ const InlineOverflowAccessorySeparateRowDemo = () => {
               <TooltipContent>{text}</TooltipContent>
             </Tooltip>
           </TooltipProvider>
-        </div>
-
-        <div className="space-y-1.5">
-          <label
-            htmlFor="inline-overflow-accessory-separate-row-text"
-            className="text-sm font-medium"
-          >
-            示例文本
-          </label>
-          <textarea
-            id="inline-overflow-accessory-separate-row-text"
-            aria-describedby="inline-overflow-accessory-separate-row-text-description"
-            value={text}
-            onChange={handleTextChange}
-            className="min-h-20 w-full resize-y rounded-md border bg-background px-3 py-2 text-sm outline-none transition-[border-color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-          />
-          <div
-            id="inline-overflow-accessory-separate-row-text-description"
-            className="text-xs text-muted-foreground"
-          >
-            修改文本长度，观察 Accessory 在第二行随 overflow 状态显示或隐藏。
-          </div>
-        </div>
+        </DemoBox.Preview>
       </div>
     </DemoBox>
   );

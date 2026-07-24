@@ -53,9 +53,13 @@ const InlineOverflowInlineNodesDemo = () => {
   };
 
   return (
-    <DemoBox>
-      <div className="space-y-3 p-6">
-        <div className="flex items-center justify-between gap-3">
+    <DemoBox defaultWidth={560} minWidth={180} maxWidth={720} widthStep={1}>
+      <div className="space-y-5 p-6">
+        <DemoBox.Controls>
+          <DemoBox.WidthSlider sliderClassName="w-56" />
+        </DemoBox.Controls>
+
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="text-sm font-medium text-muted-foreground">
             多个 inline 节点
           </div>
@@ -69,7 +73,7 @@ const InlineOverflowInlineNodesDemo = () => {
           </div>
         </div>
 
-        <div className="grid min-w-0 gap-3">
+        <DemoBox.Preview className="grid min-w-0 gap-3">
           <div className="w-full min-w-0 rounded-md border bg-background p-3">
             <div className="mb-1 text-xs text-muted-foreground">
               启用边界校正
@@ -128,7 +132,7 @@ const InlineOverflowInlineNodesDemo = () => {
               </Tooltip>
             </TooltipProvider>
           </div>
-        </div>
+        </DemoBox.Preview>
       </div>
     </DemoBox>
   );
