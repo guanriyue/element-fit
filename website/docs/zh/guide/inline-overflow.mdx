@@ -8,7 +8,13 @@ pageType: doc-wide
 
 `InlineOverflow` 用于测量单行内容是否发生横向溢出，并根据派生的 `overflow` 状态组合附属 UI。它不内置 Tooltip、Popover、展开按钮、具体布局或内容裁剪样式。
 
-它适合表格单元格、名称、路径和标签等宽度受限的单行内容。不适合多行截断、纵向书写模式、复杂 transform 或需要反事实测量的场景。
+它适合表格单元格、名称、路径和标签等宽度受限的单行内容。不适合多行截断、纵向书写模式或复杂 transform。
+
+## 能力边界
+
+`InlineOverflow` 只测量 Root 与 Content 当前形成的真实 DOM 布局，不构造隐藏副本，也不模拟尚未渲染的布局。
+
+“反事实测量”指测量当前 DOM 中并不存在的假设状态。例如，Accessory 尚未渲染，但调用方希望提前知道“如果 Accessory 显示并占用一部分宽度，Content 是否会溢出”。这需要临时构造或模拟另一种布局，不属于 `InlineOverflow` 的能力范围。组件先测量现有布局，再根据结果决定 Accessory 是否渲染。
 
 ## 导入
 
@@ -29,6 +35,56 @@ Root 和 Content 都不提供默认样式。调用方需要让 Root 形成可测
 ```
 
 首次可信测量完成后，`onOverflowChange` 会调用。之后仅在布尔状态变化，或者 Root、Content 元素替换并完成新的首次测量时调用。溢出时，Root 带有 `data-overflow` attribute；Content 和 Accessory 不重复暴露该状态。
+
+## 测量模型
+
+### 常规测量
+
+Root 与 Content 分离时，组件比较 Content 的 `scrollWidth` 与 Root 扣除 inline padding 后的 content-box width；单元素模式则直接比较同一元素的 `scrollWidth` 和 `clientWidth`。绝大多数情况下，这条路径可以直接得到结果。
+
+CSSOM View 将 `scrollWidth` 和 `clientWidth` 定义为 Web IDL 的 [`long`](https://drafts.csswg.org/cssom-view/#extensions-to-the-element-interface)，因此 JavaScript 最终读取到的是整数。恰好位于 ellipsis 临界像素时，浏览器可能已经绘制省略号，但两个整数仍然相等，普通的 `scrollWidth > clientWidth` 判断会漏掉溢出。CSSWG 的 [issue #4123](https://github.com/w3c/csswg-drafts/issues/4123) 记录了这个平台问题。
+
+### Range 临界修正
+
+当常规测量落在小于 `1px` 的临界区间时，组件会使用 [`Range`](https://developer.mozilla.org/zh-CN/docs/Web/API/Range) 选中 Content 的内容，再通过 [`Range.getBoundingClientRect()`](https://developer.mozilla.org/zh-CN/docs/Web/API/Range/getBoundingClientRect) 获取保留小数精度的包围矩形宽度，并与同一个可用宽度继续比较。
+
+Range 是这里修正常规 overflow 判断误差的核心 API。[CSSOM View](https://drafts.csswg.org/cssom-view/#extensions-to-the-range-interface) 规定，Range 的矩形由选中的文本片段和顶层元素 border area 组成：文本宽度依据字体 advance width 计算，完整选中的顶层元素则贡献自己的 border area。这解释了它为什么适合普通单行文本和一部分混合 inline 内容。
+
+### 浏览器与内容限制
+
+`Range` 和 `Range.getBoundingClientRect()` 已在主流浏览器中广泛可用，但规范只定义 Range 如何汇总几何矩形，并没有规定它必须返回“ellipsis 截断前的 intrinsic width”，也没有定义一个统一的“是否已经绘制省略号”查询。因此，这个 fallback 是基于现有浏览器行为的工程性修正，不保证在所有浏览器和所有 DOM 结构中都能解决临界误判。
+
+Range 几何计算本身也存在浏览器特有的边界问题。例如 WebKit 的 [issue #296765](https://bugs.webkit.org/show_bug.cgi?id=296765) 记录了换行文本 Range 矩形与其他引擎不一致的情况。该问题并非本组件单行场景的直接复现，但说明不能把某一个浏览器中的 Range 结果外推为通用保证。对浏览器覆盖要求较高时，应在目标浏览器中验证实际内容结构，并为完整内容保留 Tooltip 等可访问路径。
+
+## Ellipsis 边界校正
+
+下面两组内容、布局和宽度完全一致，用于对比“启用 Range 临界修正”和“仅使用普通判断”时的判定差异。
+
+> 静态截图：下图用于展示边界校正可能带来的判定差异，不是可交互 demo。这个现象只在极限边界情况下才可能复现，通常需要多次调整文本或宽度。下面的 preview 示例可以用于本地继续观察。
+
+![启用边界校正和关闭边界校正时的 ellipsis 判定对比](/inline-overflow-range-diff.png)
+
+下面是可交互 demo。Slider 用于快速调整，数字输入框可以直接输入宽度或使用上下方向键逐像素修正；也可以修改文本长度。命中后，示例会同时展示 `clientWidth`、`scrollWidth` 和 Range width：
+
+```tsx file="<root>/src/demos/inline-overflow/wide.tsx" preview
+
+```
+
+## 多个 Inline 节点的边界校正
+
+下面示例包含 `inline-block` 和 `inline-flex` 节点。Range 会包含普通 flow 中被选中的文本和顶层元素 border area，但 margin、伪元素、定位和 transform 等不属于可靠测量范围。两组内容、布局和宽度保持一致，用于观察此类内容在“启用边界校正”和“关闭边界校正”时的结果。
+
+> 静态截图：下图用于展示多个 inline 节点场景下的对比效果，不是可交互 demo。这个现象同样只在极限边界情况下才可能复现。下面的 preview 示例可以用于本地继续观察。
+
+![多个 inline 节点在启用边界校正和关闭边界校正时的对比](/inline-overflow-inline-nodes-diff.png)
+
+下面是可交互 demo。除了调整宽度，还可以修改最后一个 `inline-flex` 节点中的文本；其余 inline 节点结构保持不变，便于持续观测混合节点场景：
+
+```tsx file="<root>/src/demos/inline-overflow/inline-nodes.tsx" preview
+
+```
+
+Content 内可以包含多个 inline / inline-block / inline-flex 节点。组件只测量 Content 这个节点本身，因此仍应保证一个 Root 只有一个 Content。
 
 ## Hover 展示完整内容
 
@@ -68,45 +124,13 @@ Root、Content 和 Accessory 都支持 `asChild`。组件会把 ref、状态属�
 
 如果不需要 Root 和 Content 分别渲染两个 DOM 节点，可以让 Root 使用 `asChild`，并将 Content 作为它的唯一 child。Root 的 ref、`data-overflow` 和 Content 的测量 ref 会合并到同一个元素上。
 
-单元素模式支持直接在共享元素上设置 inline padding。组件会使用同一个元素的 `scrollWidth` 和 `clientWidth` 比较 padding box，并在临界范围内继续使用 content box 和 Range 校正，避免把元素自身的 padding 误判为内容溢出。
+单元素模式支持直接在共享元素上设置 inline padding。组件会使用同一个元素的 `scrollWidth` 和 `clientWidth` 比较 padding box，并在临界范围内继续使用 content box 和 Range 修正，避免把元素自身的 padding 误判为内容溢出。
 
 ```tsx file="<root>/src/demos/inline-overflow/single-element.tsx" preview
 
 ```
 
 这种形式适合只需要 overflow 状态或 `data-overflow` 的紧凑结构。需要组合 Accessory 时，建议继续使用分离的 Root 和 Content，避免 Accessory 进入 Content 的测量子树。
-
-## Ellipsis 边界校正
-
-在 ellipsis 的临界位置，浏览器可能已经绘制省略号，但 JavaScript 读取到的 `clientWidth` 和 `scrollWidth` 仍然相等。此时使用 `scrollWidth > clientWidth` 的普通判断会得到“未溢出”，从而漏掉已经出现的省略。这个浏览器平台问题可以参考 CSSWG 的 [issue #4123](https://github.com/w3c/csswg-drafts/issues/4123)。
-
-组件会对这类边界情况做额外校正。下面两组内容、布局和宽度完全一致，用于对比“启用边界校正”和“关闭边界校正”时的判定差异。校正使用 Content 的 Range bounding rect 补充整数精度的 `scrollWidth`；它适合普通单行 flow，但不等价于任意 DOM 子树的 intrinsic width。
-
-> 静态截图：下图用于展示边界校正可能带来的判定差异，不是可交互 demo。这个现象只在极限边界情况下才可能复现，通常需要多次调整文本或宽度。下面的 preview 示例可以用于本地继续观察。
-
-![启用边界校正和关闭边界校正时的 ellipsis 判定对比](/inline-overflow-range-diff.png)
-
-下面是可交互 demo。Slider 用于快速调整，数字输入框可以直接输入宽度或使用上下方向键逐像素修正；也可以修改文本长度。命中后，示例会同时展示 `clientWidth`、`scrollWidth` 和 Range width：
-
-```tsx file="<root>/src/demos/inline-overflow/wide.tsx" preview
-
-```
-
-## 多个 Inline 节点的边界校正
-
-下面示例包含 `inline-block` 和 `inline-flex` 节点。Range 会包含普通 flow 中被选中的文本和顶层元素 border area，但 margin、伪元素、定位和 transform 等不属于可靠测量范围。两组内容、布局和宽度保持一致，用于观察此类内容在“启用边界校正”和“关闭边界校正”时的结果。
-
-> 静态截图：下图用于展示多个 inline 节点场景下的对比效果，不是可交互 demo。这个现象同样只在极限边界情况下才可能复现。下面的 preview 示例可以用于本地继续观察。
-
-![多个 inline 节点在启用边界校正和关闭边界校正时的对比](/inline-overflow-inline-nodes-diff.png)
-
-下面是可交互 demo。除了调整宽度，还可以修改最后一个 `inline-flex` 节点中的文本；其余 inline 节点结构保持不变，便于持续观测混合节点场景：
-
-```tsx file="<root>/src/demos/inline-overflow/inline-nodes.tsx" preview
-
-```
-
-Content 内可以包含多个 inline / inline-block / inline-flex 节点。组件只测量 Content 这个节点本身，因此仍应保证一个 Root 只有一个 Content。
 
 ## 布局要点
 
@@ -126,7 +150,3 @@ Content 内可以包含多个 inline / inline-block / inline-flex 节点。组�
 浏览器目前没有稳定可用的 Computed Style Observer。`font-size`、`font-family`、`letter-spacing` 等 computed style 的变化本身无法被直接观测，因此由这些样式变化导致的 overflow 变化也不保证被捕获。兄弟选择器、父子选择器、主题 class、响应式 class 等间接改变 Content 文本布局的写法都需要谨慎使用；只有等类似 [ComputedStyleObserver](https://github.com/w3c/csswg-drafts/issues/8982) 的能力成熟后，这类变化才可能被更稳定地观测。
 
 首次客户端测量前，内部 overflow 状态为 `false`，`data-overflow` 不存在，Accessory 不渲染。当前不提供 `defaultOverflow`、受控 `overflow` 或手动 remeasure API。
-
-这里的“反事实测量”指测量一个当前 DOM 布局里并不存在的假设状态。例如：Accessory 还没有渲染，但调用方想提前知道“如果 Accessory 显示并占掉一部分宽度，Content 会不会溢出”。这需要临时构造或模拟另一种布局再测量。`InlineOverflow` 不处理这种模式，它只测量当前 Root 与 Content 形成的真实布局，再根据结果决定 Accessory 是否渲染。
-
-在极限临界范围内，浏览器可能已经绘制 ellipsis，但 JavaScript 读取到的尺寸仍不足以表达同等精度。组件会在 `scrollWidth` 与 Root content-box width 相差小于 `1px` 时尝试 Range 边界校正。Range 能覆盖普通单行 flow 中的文本、元素和混合内容，但 margin、伪元素、定位、transform 和多行布局仍不属于可靠测量范围。
