@@ -1,60 +1,10 @@
 [
   {
-    "text": "指南",
-    "items": [
-      {
-        "text": "首页",
-        "link": "/"
-      },
-      {
-        "text": "CompactGrid",
-        "link": "/compact-grid"
-      },
-      {
-        "text": "FitSwitch",
-        "link": "/fit-switch"
-      },
-      {
-        "text": "InlineOverflow",
-        "link": "/inline-overflow"
-      },
-      {
-        "text": "LineClamp",
-        "link": "/line-clamp"
-      },
-      {
-        "text": "Textarea",
-        "link": "/textarea"
-      }
-    ]
+    "text": "组件指南",
+    "link": "/guide/"
   },
   {
     "text": "压力测试",
-    "items": [
-      {
-        "text": "CompactGrid",
-        "link": "/stress/compact-grid"
-      },
-      {
-        "text": "FitSwitch",
-        "link": "/stress/fit-switch"
-      },
-      {
-        "text": "InlineOverflow",
-        "link": "/stress/inline-overflow"
-      },
-      {
-        "text": "LineClamp",
-        "link": "/stress/line-clamp"
-      },
-      {
-        "text": "Textarea",
-        "link": "/stress/textarea"
-      },
-      {
-        "text": "综合业务场景",
-        "link": "/stress/real-world"
-      }
-    ]
+    "link": "/stress/"
   }
 ]

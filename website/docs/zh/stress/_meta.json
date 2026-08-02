@@ -1,0 +1,37 @@
+[
+  {
+    "type": "file",
+    "name": "index",
+    "label": "概览"
+  },
+  {
+    "type": "file",
+    "name": "compact-grid",
+    "label": "CompactGrid"
+  },
+  {
+    "type": "file",
+    "name": "fit-switch",
+    "label": "FitSwitch"
+  },
+  {
+    "type": "file",
+    "name": "inline-overflow",
+    "label": "InlineOverflow"
+  },
+  {
+    "type": "file",
+    "name": "line-clamp",
+    "label": "LineClamp"
+  },
+  {
+    "type": "file",
+    "name": "textarea",
+    "label": "Textarea"
+  },
+  {
+    "type": "file",
+    "name": "real-world",
+    "label": "综合业务场景"
+  }
+]

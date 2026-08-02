@@ -1,22 +1,38 @@
 ---
-description: Element Fit 文档占位页。
-outline: false
-pageType: doc-wide
+pageType: home
+title: Element Fit
+titleSuffix: React 元素自适应布局组件
+description: Element Fit 提供一组根据元素真实可用空间调整布局和内容展示的 React 组件。
+
+hero:
+  name: Element Fit
+  text: React 元素自适应布局组件
+  tagline: 围绕真实可用空间、内容溢出和高效测量构建
+  actions:
+    - theme: brand
+      text: 查看组件
+      link: ./guide/
+    - theme: alt
+      text: 压力测试
+      link: ./stress/
+
+features:
+  - title: CompactGrid
+    details: 根据容器可用宽度排列网格项，并支持条件渲染、跨列和额外操作区域。
+    link: ./guide/compact-grid
+  - title: FitSwitch
+    details: 在展开与紧凑两套布局之间自动选择能够放入当前空间的方案。
+    link: ./guide/fit-switch
+  - title: InlineOverflow
+    details: 观测单行内容是否发生横向溢出，并据此组合 Tooltip 或 Accessory。
+    link: ./guide/inline-overflow
+  - title: LineClamp
+    details: 限制 inline 内容的可见行数，并在内容确实溢出时渲染 suffix。
+    link: ./guide/line-clamp
+  - title: Textarea
+    details: 保留原生 textarea 用法，同时根据内容、宽度和行数边界自动调整高度。
+    link: ./guide/textarea
+  - title: 性能观测
+    details: 在批量渲染和综合业务布局中对比组件测量与基础渲染的性能表现。
+    link: ./stress/
 ---
-
-# Element Fit
-
-Element Fit 提供一组根据元素可用空间自适应的 React 布局组件。
-
-## FitGrid 查询表单
-
-查询表单通常会被放在页面顶部、抽屉、侧栏或卡片内容区中。它面对的不是固定的 viewport
-宽度，而是外层容器留给它的实际空间。
-
-`FitGrid` 适合这类场景：每个查询项只声明自己的最小可用宽度，网格会在当前空间中尽量排列更多列，并在空间不足时自然换行。
-
-下面的示例是一个简单订单查询表单。关键词、状态、时间、负责人和操作按钮都作为网格项参与排列。
-
-```tsx file="<root>/src/demos/fit-grid/query-form.tsx" preview
-
-```
