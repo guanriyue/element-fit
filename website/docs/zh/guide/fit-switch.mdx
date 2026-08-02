@@ -10,8 +10,20 @@ pageType: doc
 
 当 `Expanded` 能放下时，显示完整视图；当放不下时，切换到 `Collapsed` 视图。
 
+组件不会为两个 view 注入展示或布局样式，只在当前用于测量的 view 上添加空值的 `data-fit-measuring` attribute；当前展示的 view 不带该 attribute。调用方需要让 measuring view 脱离常规流并在视觉上隐藏它，通常可以根据 dataset 设置 `position: absolute` 与 `opacity: 0`。不要使用 `display: none`，否则组件无法测量它的宽度。
+
 下面的 tabs 示例中，完整视图显示“图标 + 文案”，紧凑视图只显示图标。可以连续调整容器宽度，并改变 tab 数量、标签长度、Expanded padding、`asChild` 和过渡样式，观察切换临界点如何变化。
 
 ```tsx file="<root>/src/demos/fit-switch/tabs.tsx" preview
+
+```
+
+## 裁切切换动画
+
+两个 view 会始终保持挂载，并通过 `data-fit-measuring` 标记当前 measuring view。下面的工具栏让共同 parent 右对齐并设置 `overflow: hidden`：Expanded 在 measuring 状态下向右移动自身宽度，attribute 被移除时从右向左划入；反向切换时则向右划出。Collapsed 使用相同的状态旋转并显示齿轮按钮。
+
+示例没有降低 Expanded 的 opacity，而是通过 Tailwind 状态变体在 measuring 状态下设置 `position: absolute` 和 `translate-x-full`，使它完全依靠 transform 和父容器裁切隐藏。transform 不改变 ResizeObserver 读取的 border-box width，因此不会干扰 FitSwitch 的宽度判定。
+
+```tsx file="<root>/src/demos/fit-switch/actions-animation.tsx" preview
 
 ```

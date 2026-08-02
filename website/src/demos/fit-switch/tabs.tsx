@@ -111,9 +111,9 @@ const FitSwitchTabs = (props: FitSwitchTabsProps) => {
     transition,
   } = props;
   const viewClassName = cn(
-    'w-max origin-left',
+    'top-0 left-0 w-max origin-left data-fit-measuring:absolute data-fit-measuring:opacity-0',
     transition &&
-      'transition-[opacity,transform] duration-200 data-[fit-switch-state=measuring]:scale-95 data-[fit-switch-state=measuring]:opacity-0 data-[fit-switch-state=visible]:scale-100 data-[fit-switch-state=visible]:opacity-100',
+      'scale-100 transition-[opacity,transform] duration-200 data-fit-measuring:scale-95',
   );
 
   return (
