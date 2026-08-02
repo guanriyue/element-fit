@@ -1,12 +1,16 @@
 import {
+  type ChangeEvent,
   type ComponentPropsWithoutRef,
   createContext,
+  type KeyboardEvent,
   type ReactNode,
   useContext,
+  useEffect,
   useId,
   useMemo,
   useState,
 } from 'react';
+import { Input } from '@/components/ui/input';
 import { Slider as UiSlider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 
@@ -25,6 +29,8 @@ export type DemoBoxSliderProps = Omit<
   'onValueChange' | 'value'
 > & {
   label: ReactNode;
+  numberInput?: boolean;
+  numberInputSuffix?: ReactNode;
   onValueChange: (value: number) => void;
   sliderClassName?: string;
   value: number;
@@ -36,6 +42,8 @@ export type DemoBoxWidthSliderProps = Omit<
   | 'label'
   | 'max'
   | 'min'
+  | 'numberInput'
+  | 'numberInputSuffix'
   | 'onValueChange'
   | 'step'
   | 'value'
@@ -74,6 +82,8 @@ const DemoBoxSlider = (props: DemoBoxSliderProps) => {
     className,
     id: propId,
     label,
+    numberInput = false,
+    numberInputSuffix,
     onValueChange,
     sliderClassName,
     value,
@@ -82,25 +92,95 @@ const DemoBoxSlider = (props: DemoBoxSliderProps) => {
   } = props;
   const generatedId = useId();
   const id = propId ?? generatedId;
+  const numberInputId = `${id}-number`;
+  const min = sliderProps.min ?? 0;
+  const max = sliderProps.max ?? 100;
+  const step = sliderProps.step ?? 1;
+  const [inputValue, setInputValue] = useState(() => String(value));
+
+  useEffect(() => {
+    setInputValue(String(value));
+  }, [value]);
 
   const handleValueChange = (nextValue: number[]) => {
     onValueChange(nextValue[0] ?? value);
+  };
+
+  const handleNumberInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const nextInputValue = event.target.value;
+    const nextValue = event.target.valueAsNumber;
+
+    setInputValue(nextInputValue);
+
+    if (Number.isFinite(nextValue) && nextValue >= min && nextValue <= max) {
+      onValueChange(nextValue);
+    }
+  };
+
+  const commitNumberInput = () => {
+    const nextValue = Number(inputValue);
+
+    if (!Number.isFinite(nextValue) || inputValue.trim() === '') {
+      setInputValue(String(value));
+      return;
+    }
+
+    const nextValueInRange = Math.min(Math.max(nextValue, min), max);
+    setInputValue(String(nextValueInRange));
+    onValueChange(nextValueInRange);
+  };
+
+  const handleNumberInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.currentTarget.blur();
+    }
+
+    if (event.key === 'Escape') {
+      setInputValue(String(value));
+    }
   };
 
   return (
     <div
       className={cn('flex flex-wrap items-center gap-x-4 gap-y-2', className)}
     >
-      <div className="flex min-w-28 items-center justify-between gap-3">
+      <div
+        className={cn(
+          'flex min-w-28 items-center justify-between gap-3',
+          numberInput && 'min-w-44',
+        )}
+      >
         <label
-          htmlFor={id}
+          htmlFor={numberInput ? numberInputId : id}
           className="text-sm font-medium text-muted-foreground"
         >
           {label}
         </label>
-        <span className="rounded-md border px-2 py-1 text-xs tabular-nums text-muted-foreground">
-          {valueFormatter ? valueFormatter(value) : value}
-        </span>
+        {numberInput ? (
+          <div className="flex items-center gap-1.5">
+            <Input
+              id={numberInputId}
+              type="number"
+              min={min}
+              max={max}
+              step={step}
+              value={inputValue}
+              onBlur={commitNumberInput}
+              onChange={handleNumberInputChange}
+              onKeyDown={handleNumberInputKeyDown}
+              className="h-8 w-20 px-2 text-right text-xs tabular-nums"
+            />
+            {numberInputSuffix ? (
+              <span className="text-xs text-muted-foreground">
+                {numberInputSuffix}
+              </span>
+            ) : null}
+          </div>
+        ) : (
+          <span className="rounded-md border px-2 py-1 text-xs tabular-nums text-muted-foreground">
+            {valueFormatter ? valueFormatter(value) : value}
+          </span>
+        )}
       </div>
 
       <UiSlider
@@ -128,7 +208,8 @@ const DemoBoxWidthSlider = (props: DemoBoxWidthSliderProps) => {
       step={widthStep}
       value={width}
       onValueChange={setWidth}
-      valueFormatter={(value) => `${value}px`}
+      numberInput
+      numberInputSuffix="px"
     />
   );
 };

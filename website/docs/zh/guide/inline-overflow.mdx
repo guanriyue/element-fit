@@ -86,7 +86,7 @@ Root、Content 和 Accessory 都支持 `asChild`。组件会把 ref、状态属�
 
 ![启用边界校正和关闭边界校正时的 ellipsis 判定对比](/inline-overflow-range-diff.png)
 
-下面是可交互 demo，可使用 1px 步进的宽度控制尝试命中临界位置：
+下面是可交互 demo。Slider 用于快速调整，数字输入框可以直接输入宽度或使用上下方向键逐像素修正；也可以修改文本长度。命中后，示例会同时展示 `clientWidth`、`scrollWidth` 和 Range width：
 
 ```tsx file="<root>/src/demos/inline-overflow/wide.tsx" preview
 
@@ -100,7 +100,7 @@ Root、Content 和 Accessory 都支持 `asChild`。组件会把 ref、状态属�
 
 ![多个 inline 节点在启用边界校正和关闭边界校正时的对比](/inline-overflow-inline-nodes-diff.png)
 
-下面是可交互 demo，可使用 1px 步进的宽度控制尝试命中临界位置：
+下面是可交互 demo。除了调整宽度，还可以修改最后一个 `inline-flex` 节点中的文本；其余 inline 节点结构保持不变，便于持续观测混合节点场景：
 
 ```tsx file="<root>/src/demos/inline-overflow/inline-nodes.tsx" preview
 

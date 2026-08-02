@@ -7,6 +7,10 @@ import {
 } from 'react';
 import { DemoBox } from '@/components/custom/demo-box';
 import { Label } from '@/components/ui/label';
+import {
+  BoundaryComparison,
+  useBoundaryMetrics,
+} from '@/demos/inline-overflow/boundary-observation';
 
 type InlineOverflowDebugProps = ComponentProps<typeof InlineOverflow> & {
   __debugDisableRangeFallback?: boolean;
@@ -23,6 +27,7 @@ const InlineOverflowWideDemo = () => {
   const [text, setText] = useState(defaultText);
   const [overflow, setOverflow] = useState(false);
   const [overflowWithoutFallback, setOverflowWithoutFallback] = useState(false);
+  const { contentRef, metrics } = useBoundaryMetrics();
 
   const handleTextChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
     setText(event.target.value);
@@ -47,24 +52,17 @@ const InlineOverflowWideDemo = () => {
               id="inline-overflow-wide-text-description"
               className="text-xs text-muted-foreground"
             >
-              以 1px 步进调整宽度，尝试命中 ellipsis 的临界位置。
+              修改文本，或使用数字输入框逐像素修正宽度，尝试命中 ellipsis
+              的临界位置。
             </div>
           </div>
         </DemoBox.Controls>
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="text-sm font-medium text-muted-foreground">
-            Ellipsis 边界校正
-          </div>
-          <div className="flex items-center gap-2 text-xs">
-            <div className="rounded-md border px-2 py-1">
-              corrected: {overflow ? 'overflow' : 'fit'}
-            </div>
-            <div className="rounded-md border px-2 py-1">
-              raw: {overflowWithoutFallback ? 'overflow' : 'fit'}
-            </div>
-          </div>
-        </div>
+        <BoundaryComparison
+          correctedOverflow={overflow}
+          regularOverflow={overflowWithoutFallback}
+          metrics={metrics}
+        />
 
         <DemoBox.Preview className="grid min-w-0 gap-3">
           <div className="min-w-0 rounded-md border bg-background p-3">
@@ -90,7 +88,10 @@ const InlineOverflowWideDemo = () => {
               className="flex w-full min-w-0 data-overflow:text-primary"
               onOverflowChange={setOverflowWithoutFallback}
             >
-              <InlineOverflow.Content className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+              <InlineOverflow.Content
+                ref={contentRef}
+                className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+              >
                 {text}
               </InlineOverflow.Content>
             </InlineOverflowDebug>
