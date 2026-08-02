@@ -27,9 +27,18 @@ import { FitSwitch } from '@guanriyue/react-fit/fit-switch';
 
 ## Styles And Measurement
 
-`FitSwitch` 只为当前不可见的测量 view 设置 `position: absolute`、`opacity: 0` 和
-`pointer-events: none`，并通过 `inert` 阻止交互和焦点进入。组件不会设置 `inline-size` 或
-`max-inline-size`。
+`FitSwitch` 不为 view 注入展示或布局样式，只在当前用于测量的 view 上添加空值的
+`data-fit-measuring` attribute，并通过 `inert` 阻止它的交互和焦点进入。当前展示的 view 不带该
+attribute。
+
+调用方需要让 measuring view 脱离常规流并在视觉上隐藏它。普通场景可以根据 dataset 设置
+`position: absolute` 和 `opacity: 0`；动画场景也可以使用 transform 将 view 移到裁切容器外。不能使用
+`display: none`，否则组件无法继续测量它的 border box。
+
+```tsx
+const viewClassName =
+  'data-fit-measuring:absolute data-fit-measuring:opacity-0';
+```
 
 调用方必须保证 Expanded 的 border box 能表达完整内容所需宽度，并且在 visible 和 measuring
 状态之间保持相同的宽度语义。通常可以使用 `inline-flex`、`inline-block` 或等价的内在宽度样式。

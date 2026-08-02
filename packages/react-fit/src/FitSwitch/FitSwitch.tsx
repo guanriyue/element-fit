@@ -30,12 +30,6 @@ export type FitSwitchViewProps = React.ComponentPropsWithoutRef<typeof Primitive
 
 const fitSwitchStoreContext = createContext<FitSwitchStore | null>(null);
 
-const fitSwitchMeasuringStyle: React.CSSProperties = {
-  position: 'absolute',
-  opacity: 0,
-  pointerEvents: 'none',
-};
-
 const useFitSwitchStore = (componentName: string): FitSwitchStore => {
   const store = useContext(fitSwitchStoreContext);
 
@@ -74,13 +68,12 @@ const createFitSwitchView = (view: FitSwitchView) => {
   const componentName = view === 'collapsed' ? 'FitSwitch.Collapsed' : 'FitSwitch.Expanded';
 
   const FitSwitchViewComponent = forwardRef<HTMLElement, FitSwitchViewProps>((props, ref) => {
-    const { className, inert, style, ...restProps } = props;
+    const { className, inert, ...restProps } = props;
     const store = useFitSwitchStore(componentName);
     const mode = useFitSwitchSelector(componentName, (state) => {
       return state.mode;
     });
     const visible = mode === view;
-    const state = visible ? 'visible' : 'measuring';
     const registerViewRef = useCallback(
       (element: HTMLElement | null) => {
         store.setViewElement(view, element);
@@ -94,10 +87,8 @@ const createFitSwitchView = (view: FitSwitchView) => {
         {...restProps}
         ref={composedRef}
         className={className}
-        style={visible ? style : { ...style, ...fitSwitchMeasuringStyle }}
         inert={visible ? inert : true}
-        data-fit-switch-view={view}
-        data-fit-switch-state={state}
+        data-fit-measuring={visible ? undefined : ''}
       />
     );
   });
