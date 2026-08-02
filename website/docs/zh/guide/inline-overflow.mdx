@@ -106,6 +106,16 @@ Accessory 只根据 `overflow` 状态显示或隐藏，不参与溢出判定。�
 
 ```
 
+### 保留文件名尾部
+
+文件列表中可以让 Content 始终渲染完整文件名，并使用普通 ellipsis 展示开头；Accessory 则在 overflow 时复制一份业务希望保留的尾部。这里的判定基准仍是“完整文件名能否放进 Root”，而不是 Accessory 挂载后 Content 获得的剩余宽度，因此不会因为尾部占据空间而反复切换状态。
+
+保留范围应由业务决定，例如最后一个语义片段与扩展名。由于 Accessory 中的文字与完整文件名重复，示例使用 `aria-hidden` 和 `user-select: none`，避免读屏与文本选择得到两份尾部内容。
+
+```tsx file="<root>/src/demos/inline-overflow/filename-suffix.tsx" preview
+
+```
+
 ### 单独一行
 
 ```tsx file="<root>/src/demos/inline-overflow/accessory-separate-row.tsx" preview
