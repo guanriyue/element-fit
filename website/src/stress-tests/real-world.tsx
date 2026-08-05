@@ -384,10 +384,10 @@ const OrderRow = memo((props: OrderRowProps) => {
         <div className="@container relative overflow-hidden">
           {renderMode === 'component' ? (
             <FitSwitch>
-              <FitSwitch.Collapsed className="top-0 left-0 w-max data-fit-measuring:absolute data-fit-measuring:opacity-0">
+              <FitSwitch.Collapsed className="top-0 left-0 w-max data-fit-inactive:absolute data-fit-inactive:opacity-0">
                 {collapsedActions}
               </FitSwitch.Collapsed>
-              <FitSwitch.Expanded className="top-0 left-0 flex w-max items-center data-fit-measuring:absolute data-fit-measuring:opacity-0">
+              <FitSwitch.Expanded className="top-0 left-0 flex w-max items-center data-fit-inactive:absolute data-fit-inactive:opacity-0">
                 {expandedActions}
               </FitSwitch.Expanded>
             </FitSwitch>

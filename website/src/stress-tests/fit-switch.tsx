@@ -54,10 +54,10 @@ const FitSwitchList = memo((props: FitSwitchListProps) => {
           <div className="@container relative min-w-0 overflow-hidden">
             {renderMode === 'component' ? (
               <FitSwitch>
-                <FitSwitch.Collapsed className="top-0 left-0 w-max data-fit-measuring:absolute data-fit-measuring:opacity-0">
+                <FitSwitch.Collapsed className="top-0 left-0 w-max data-fit-inactive:absolute data-fit-inactive:opacity-0">
                   <FitSwitchLabels labels={compactLabels} />
                 </FitSwitch.Collapsed>
-                <FitSwitch.Expanded className="top-0 left-0 w-max data-fit-measuring:absolute data-fit-measuring:opacity-0">
+                <FitSwitch.Expanded className="top-0 left-0 w-max data-fit-inactive:absolute data-fit-inactive:opacity-0">
                   <FitSwitchLabels labels={expandedLabels} />
                 </FitSwitch.Expanded>
               </FitSwitch>

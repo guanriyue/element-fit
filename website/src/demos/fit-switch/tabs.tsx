@@ -56,8 +56,10 @@ type FitSwitchTabsProps = {
   activeValue: string;
   asChild: boolean;
   expandedPadding: number;
+  ignoreInvalidated: boolean;
   items: readonly TabItem[];
   longLabels: boolean;
+  longTransition: boolean;
   onValueChange: (value: string) => void;
   transition: boolean;
 };
@@ -105,15 +107,21 @@ const FitSwitchTabs = (props: FitSwitchTabsProps) => {
     activeValue,
     asChild,
     expandedPadding,
+    ignoreInvalidated,
     items: visibleItems,
     longLabels,
+    longTransition,
     onValueChange,
     transition,
   } = props;
   const viewClassName = cn(
-    'top-0 left-0 w-max origin-left data-fit-measuring:absolute data-fit-measuring:opacity-0',
+    'top-0 left-0 w-max origin-left data-fit-inactive:absolute data-fit-inactive:opacity-0',
     transition &&
-      'scale-100 transition-[opacity,transform] duration-200 data-fit-measuring:scale-95',
+      'scale-100 transition-[opacity,transform] data-fit-inactive:scale-95',
+    transition && (longTransition ? 'duration-1000' : 'duration-200'),
+    transition &&
+      !ignoreInvalidated &&
+      'data-fit-invalidated:transition-none',
   );
 
   return (
@@ -154,6 +162,8 @@ const FitSwitchTabsDemo = () => {
   const [longLabels, setLongLabels] = useState(true);
   const [asChild, setAsChild] = useState(false);
   const [transition, setTransition] = useState(true);
+  const [ignoreInvalidated, setIgnoreInvalidated] = useState(false);
+  const [longTransition, setLongTransition] = useState(false);
   const visibleItems = items.slice(0, itemCount);
 
   const handleItemCountChange = (nextItemCount: number) => {
@@ -249,6 +259,34 @@ const FitSwitchTabsDemo = () => {
                 transition
               </label>
             </div>
+
+            <div className="flex items-center gap-2">
+              <Switch
+                id="fit-switch-ignore-invalidated"
+                checked={ignoreInvalidated}
+                onCheckedChange={setIgnoreInvalidated}
+              />
+              <label
+                htmlFor="fit-switch-ignore-invalidated"
+                className="text-sm font-medium"
+              >
+                不设置 invalidated transition-none
+              </label>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Switch
+                id="fit-switch-long-transition"
+                checked={longTransition}
+                onCheckedChange={setLongTransition}
+              />
+              <label
+                htmlFor="fit-switch-long-transition"
+                className="text-sm font-medium"
+              >
+                长 transition duration
+              </label>
+            </div>
           </div>
         </DemoBox.Controls>
 
@@ -257,8 +295,10 @@ const FitSwitchTabsDemo = () => {
             activeValue={activeValue}
             asChild={asChild}
             expandedPadding={expandedPadding}
+            ignoreInvalidated={ignoreInvalidated}
             items={visibleItems}
             longLabels={longLabels}
+            longTransition={longTransition}
             onValueChange={handleValueChange}
             transition={transition}
           />

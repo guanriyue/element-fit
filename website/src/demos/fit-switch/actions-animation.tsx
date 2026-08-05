@@ -44,7 +44,7 @@ const FitSwitchActionsAnimationDemo = () => {
                 <DropdownMenu>
                   <FitSwitch.Collapsed
                     asChild
-                    className="top-0 right-0 rotate-0 opacity-100 delay-150 transition-[opacity,transform] duration-200 ease-out data-fit-measuring:absolute data-fit-measuring:rotate-90 data-fit-measuring:opacity-0 data-fit-measuring:delay-0 motion-reduce:transition-none"
+                    className="top-0 right-0 rotate-0 opacity-100 delay-150 transition-[opacity,transform] duration-200 ease-out data-fit-inactive:absolute data-fit-inactive:rotate-90 data-fit-inactive:opacity-0 data-fit-inactive:delay-0 data-fit-invalidated:transition-none motion-reduce:transition-none"
                   >
                     <DropdownMenuTrigger asChild>
                       <Button
@@ -74,7 +74,7 @@ const FitSwitchActionsAnimationDemo = () => {
 
                 <FitSwitch.Expanded
                   asChild
-                  className="top-0 right-0 flex w-max shrink-0 translate-x-0 gap-2 transition-transform duration-300 ease-out data-fit-measuring:absolute data-fit-measuring:translate-x-full motion-reduce:transition-none"
+                  className="top-0 right-0 flex w-max shrink-0 translate-x-0 gap-2 transition-transform duration-300 ease-out data-fit-inactive:absolute data-fit-inactive:translate-x-full data-fit-invalidated:transition-none motion-reduce:transition-none"
                 >
                   <div>
                     {actions.map((action) => {
