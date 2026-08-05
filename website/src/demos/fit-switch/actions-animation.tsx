@@ -35,9 +35,7 @@ const FitSwitchActionsAnimationDemo = () => {
 
         <DemoBox.Preview className="rounded-md border bg-background p-3">
           <div className="flex min-w-0 items-center gap-4">
-            <div className="min-w-0 flex-1 truncate text-sm font-medium">
-              项目操作
-            </div>
+            <div className="shrink-0 text-sm font-medium">项目操作</div>
 
             <div className="relative flex min-h-8 min-w-0 flex-1 justify-end overflow-hidden">
               <FitSwitch>
