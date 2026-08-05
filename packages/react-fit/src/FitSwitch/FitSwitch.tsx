@@ -8,6 +8,7 @@ import {
   useMemo,
   useSyncExternalStore,
 } from 'react';
+import { useStableSelector } from '../_internal/useStableSelector.ts';
 import type { FitSwitchState, FitSwitchStore, FitSwitchView } from './store.ts';
 import { createFitSwitchStore } from './store.ts';
 
@@ -27,6 +28,18 @@ export type FitSwitchProps = {
  * 默认渲染 `div`。传入 `asChild` 时，会把 ref、data attributes 和测量状态注入到唯一 child 上。
  */
 export type FitSwitchViewProps = React.ComponentPropsWithoutRef<typeof Primitive.div>;
+
+type FitSwitchViewSnapshot = {
+  visible: boolean;
+  invalidated: boolean;
+};
+
+const isFitSwitchViewSnapshotEqual = (
+  previous: FitSwitchViewSnapshot,
+  next: FitSwitchViewSnapshot,
+): boolean => {
+  return previous.visible === next.visible && previous.invalidated === next.invalidated;
+};
 
 const fitSwitchStoreContext = createContext<FitSwitchStore | null>(null);
 
@@ -70,10 +83,16 @@ const createFitSwitchView = (view: FitSwitchView) => {
   const FitSwitchViewComponent = forwardRef<HTMLElement, FitSwitchViewProps>((props, ref) => {
     const { className, inert, ...restProps } = props;
     const store = useFitSwitchStore(componentName);
-    const state = useFitSwitchSelector(componentName, (currentState) => {
-      return currentState;
-    });
-    const visible = state.mode === view;
+    const selectViewSnapshot = useStableSelector(
+      (state: FitSwitchState): FitSwitchViewSnapshot => {
+        return {
+          visible: state.mode === view,
+          invalidated: state.invalidatedView === view,
+        };
+      },
+      isFitSwitchViewSnapshotEqual,
+    );
+    const viewSnapshot = useFitSwitchSelector(componentName, selectViewSnapshot);
     const registerViewRef = useCallback(
       (element: HTMLElement | null) => {
         store.setViewElement(view, element);
@@ -87,9 +106,9 @@ const createFitSwitchView = (view: FitSwitchView) => {
         {...restProps}
         ref={composedRef}
         className={className}
-        inert={visible ? inert : true}
-        data-fit-inactive={visible ? undefined : ''}
-        data-fit-invalidated={state.invalidatedView === view ? '' : undefined}
+        inert={viewSnapshot.visible ? inert : true}
+        data-fit-inactive={viewSnapshot.visible ? undefined : ''}
+        data-fit-invalidated={viewSnapshot.invalidated ? '' : undefined}
       />
     );
   });
