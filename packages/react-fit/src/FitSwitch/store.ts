@@ -1,4 +1,5 @@
 import { observeElementResize } from '@guanriyue/resize-observer-hub';
+import { createDoubleRafScheduler } from '../_internal/createDoubleRafScheduler.ts';
 import {
   getElementViewportProximity,
   type ViewportProximity,
@@ -13,6 +14,7 @@ export type FitSwitchView = Exclude<FitSwitchMode, 'overflow'>;
 
 export type FitSwitchState = {
   mode: FitSwitchMode;
+  invalidatedView: FitSwitchView | null;
 };
 
 export type FitSwitchStore = {
@@ -48,6 +50,7 @@ export const createFitSwitchStore = (): FitSwitchStore => {
   let unobserveExpandedResize: (() => void) | undefined;
   let snapshot: FitSwitchState = {
     mode: 'collapsed',
+    invalidatedView: null,
   };
   const listeners = new Set<FitSwitchListener>();
 
@@ -57,25 +60,59 @@ export const createFitSwitchStore = (): FitSwitchStore => {
     }
   };
 
-  const setMode = (mode: FitSwitchMode) => {
+  const scheduleClearInvalidatedView = createDoubleRafScheduler(() => {
+    if (snapshot.invalidatedView === null) {
+      return;
+    }
+
+    snapshot = {
+      ...snapshot,
+      invalidatedView: null,
+    };
+
+    notify();
+  });
+
+  const setMode = (
+    mode: FitSwitchMode,
+    invalidatedView: FitSwitchView | null = null,
+  ) => {
     if (snapshot.mode === mode) {
       return;
     }
 
     snapshot = {
       mode,
+      invalidatedView,
     };
 
     notify();
+
+    if (invalidatedView !== null) {
+      scheduleClearInvalidatedView();
+    }
+  };
+
+  const getMeasuredMode = (): FitSwitchMode => {
+    if (typeof containerWidth === 'undefined' || typeof expandedWidth === 'undefined') {
+      return 'collapsed';
+    }
+
+    return expandedWidth <= containerWidth + FIT_SWITCH_EPSILON ? 'expanded' : 'collapsed';
   };
 
   const commitMeasuredMode = () => {
-    if (typeof containerWidth === 'undefined' || typeof expandedWidth === 'undefined') {
-      setMode('collapsed');
-      return;
-    }
+    setMode(getMeasuredMode());
+  };
 
-    setMode(expandedWidth <= containerWidth + FIT_SWITCH_EPSILON ? 'expanded' : 'collapsed');
+  const commitExpandedResize = () => {
+    const mode = getMeasuredMode();
+    const invalidatedView =
+      snapshot.mode === 'expanded' && mode === 'collapsed'
+        ? 'expanded'
+        : null;
+
+    setMode(mode, invalidatedView);
   };
 
   const updateContainerWidth = (width: number) => {
@@ -85,7 +122,7 @@ export const createFitSwitchStore = (): FitSwitchStore => {
 
   const updateExpandedWidth = (width: number) => {
     expandedWidth = width;
-    viewportPriorityTaskScheduler.schedule(commitMeasuredMode, viewportProximity);
+    commitExpandedResize();
   };
 
   const stopObservingContainer = () => {
@@ -150,9 +187,7 @@ export const createFitSwitchStore = (): FitSwitchStore => {
           verticalMargin: window.innerHeight * FIT_SWITCH_VIEWPORT_MARGIN_RATIO,
           horizontalMargin: window.innerWidth * FIT_SWITCH_VIEWPORT_MARGIN_RATIO,
         });
-        updateContainerWidth(
-          entry.contentBoxSize[0]?.inlineSize ?? entry.contentRect.width,
-        );
+        updateContainerWidth(entry.contentBoxSize[0]?.inlineSize ?? entry.contentRect.width);
       },
       FIT_SWITCH_CONTAINER_RESIZE_OPTIONS,
     );
@@ -174,9 +209,7 @@ export const createFitSwitchStore = (): FitSwitchStore => {
     unobserveExpandedResize = observeElementResize(
       expandedElement,
       (entry) => {
-        updateExpandedWidth(
-          entry.borderBoxSize?.[0]?.inlineSize ?? entry.contentRect.width,
-        );
+        updateExpandedWidth(entry.borderBoxSize?.[0]?.inlineSize ?? entry.contentRect.width);
       },
       FIT_SWITCH_VIEW_RESIZE_OPTIONS,
     );

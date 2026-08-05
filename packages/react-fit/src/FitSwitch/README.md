@@ -27,17 +27,23 @@ import { FitSwitch } from '@guanriyue/react-fit/fit-switch';
 
 ## Styles And Measurement
 
-`FitSwitch` 不为 view 注入展示或布局样式，只在当前用于测量的 view 上添加空值的
-`data-fit-measuring` attribute，并通过 `inert` 阻止它的交互和焦点进入。当前展示的 view 不带该
+`FitSwitch` 不为 view 注入展示或布局样式，只在当前未选中的 view 上添加空值的
+`data-fit-inactive` attribute，并通过 `inert` 阻止它的交互和焦点进入。当前展示的 view 不带该
 attribute。
 
-调用方需要让 measuring view 脱离常规流并在视觉上隐藏它。普通场景可以根据 dataset 设置
+当当前展示的 Expanded 因自身观测宽度变化而放不下时，Expanded 会在切换为 inactive 的同时短暂获得
+空值的 `data-fit-invalidated` attribute，并至少保留一个绘制帧。它表示 Expanded 已经更新，不适合再
+作为旧内容执行退出动画。调用方可以用它关闭这一次 transition，同时保留 Collapsed 的进入动画。
+Collapsed 切换到 Expanded 以及 Container 宽度变化都不会添加该 attribute，因此仍可执行正常的双向
+切换动画。
+
+调用方需要让 inactive view 脱离常规流并在视觉上隐藏它。普通场景可以根据 dataset 设置
 `position: absolute` 和 `opacity: 0`；动画场景也可以使用 transform 将 view 移到裁切容器外。不能使用
 `display: none`，否则组件无法继续测量它的 border box。
 
 ```tsx
 const viewClassName =
-  'data-fit-measuring:absolute data-fit-measuring:opacity-0';
+  'data-fit-inactive:absolute data-fit-inactive:opacity-0 data-fit-invalidated:transition-none';
 ```
 
 调用方必须保证 Expanded 的 border box 能表达完整内容所需宽度，并且在 visible 和 measuring
@@ -57,6 +63,10 @@ Container 使用 ResizeObserver 的 `content-box`，Expanded 使用 `border-box`
 Container Resize 时，组件会采样元素与视窗的距离。视窗附近的任务在微任务中批量执行，远离视窗的任务
 通过 `requestIdleCallback` 分批执行，以降低短时间内大量计算和浏览器布局造成的压力。
 
+Expanded 的 border-box 变化不进入该调度队列，而是在 ResizeObserver 回调中立即重新判定 mode。
+这使动态内容产生的最终 mode 可以在当前绘制前提交；如果当前展示的 Expanded 因此切换为 Collapsed，
+`data-fit-invalidated` 会在最终布局至少完成一次绘制后移除。
+
 Idle Callback 使用 300ms timeout 防止页面持续繁忙时任务无限饥饿。这个 timeout 只是兜底策略，
 不代表 300ms 对所有页面负载和任务规模都是合适的延迟或执行预算。
 
@@ -72,7 +82,7 @@ near/far 分级的目标是削平 Resize 突发，而不是长期暂停离屏任
 - Container 和 Expanded 应使用一致的横向书写模式。不同 writing mode 下的 `inlineSize` 不可直接比较。
 - 绝对定位内容、`contain: size`、`display: contents` 或其他不参与元素内在尺寸计算的布局，不属于可靠
   测量范围。
-- 测量 view 不能使用 `display: none`，否则 ResizeObserver 无法得到有效的所需宽度。
+- inactive view 不能使用 `display: none`，否则 ResizeObserver 无法得到有效的所需宽度。
 
 这些边界通过文档约束，不增加运行时样式分析、DOM 克隆或同步布局兼容。此类兼容实现工作量和性能成本较高，
 但在常规后台管理页面中的收益通常有限。如果页面无法满足上述布局约定，开发者应为该场景实现自定义切换或

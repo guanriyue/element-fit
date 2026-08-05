@@ -70,10 +70,10 @@ const createFitSwitchView = (view: FitSwitchView) => {
   const FitSwitchViewComponent = forwardRef<HTMLElement, FitSwitchViewProps>((props, ref) => {
     const { className, inert, ...restProps } = props;
     const store = useFitSwitchStore(componentName);
-    const mode = useFitSwitchSelector(componentName, (state) => {
-      return state.mode;
+    const state = useFitSwitchSelector(componentName, (currentState) => {
+      return currentState;
     });
-    const visible = mode === view;
+    const visible = state.mode === view;
     const registerViewRef = useCallback(
       (element: HTMLElement | null) => {
         store.setViewElement(view, element);
@@ -88,7 +88,8 @@ const createFitSwitchView = (view: FitSwitchView) => {
         ref={composedRef}
         className={className}
         inert={visible ? inert : true}
-        data-fit-measuring={visible ? undefined : ''}
+        data-fit-inactive={visible ? undefined : ''}
+        data-fit-invalidated={state.invalidatedView === view ? '' : undefined}
       />
     );
   });
