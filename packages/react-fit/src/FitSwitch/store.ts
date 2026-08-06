@@ -23,7 +23,7 @@ export type FitSwitchStore = {
   setViewElement: (view: FitSwitchView, element: HTMLElement | null) => void;
 };
 
-const FIT_SWITCH_EPSILON = 1;
+const FIT_SWITCH_EPSILON = 0;
 const FIT_SWITCH_VIEWPORT_MARGIN_RATIO = 1;
 const FIT_SWITCH_CONTAINER_RESIZE_OPTIONS = {
   box: 'content-box',
