@@ -178,9 +178,10 @@ export const FitGridItem = forwardRef<HTMLDivElement, FitGridItemProps>((props, 
 FitGridItem.displayName = 'FitGridItem' as const;
 
 /**
- * 使用 CSS Grid 排列子项，并根据当前元素可用空间调整列数。
+ * 对 CSS Grid 自适应列能力的简易封装，根据当前元素可用空间调整列数。
  *
  * 列数由每个 item 的最小宽度驱动，而不是由页面或容器断点直接决定。
+ * 组件不进行 JavaScript 尺寸测量，列数调整由浏览器的 CSS Grid 布局完成。
  * 这使得它适用于过滤表单、工具面板、卡片列表，以及其他需要适配周围空间的重复控件。
  *
  * @example

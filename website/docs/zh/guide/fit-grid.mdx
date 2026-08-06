@@ -1,0 +1,23 @@
+---
+description: FitGrid 是基于 CSS Grid 的简易封装，会根据可用空间自适应列数。
+outline: true
+pageType: doc
+---
+
+# FitGrid
+
+`FitGrid` 是对 CSS Grid 自适应列能力的简易封装。它使用 `minItemWidth` 表达每一列可接受的最小宽度，并由浏览器根据当前元素的可用空间自动调整列数。
+
+组件不会通过 JavaScript 测量容器，也不会监听尺寸变化或报告当前列数。它只把 `minItemWidth`、列数限制和间距组合成 `grid-template-columns` 等必要的 Grid 样式，因此容器宽度变化时的布局更新完全由 CSS Grid 完成。
+
+下面的查询表单最多显示四列。调整容器宽度，可以观察字段和操作按钮如何在不依赖 viewport breakpoint 的情况下自动换列。最后一个操作区使用 `FitGrid.Item pin="row-end"` 放在当前行末尾。
+
+```tsx file="<root>/src/demos/fit-grid/query-form.tsx" preview
+
+```
+
+## 适用范围
+
+`FitGrid` 适合过滤表单、设置面板和卡片列表等各项具有相同最小宽度的布局。`minColumns` 和 `maxColumns` 可以限制列数范围，`colGap` 和 `rowGap` 用于控制间距。
+
+如果布局需要知道当前实际列数、根据状态移动内容，或让额外操作在不同节点之间切换位置，则需要在 CSS Grid 之外增加状态管理；例如可以使用在 `FitGrid` 基础上扩展的 `CompactGrid`。

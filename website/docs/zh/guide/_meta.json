@@ -6,6 +6,11 @@
   },
   {
     "type": "file",
+    "name": "fit-grid",
+    "label": "FitGrid"
+  },
+  {
+    "type": "file",
     "name": "compact-grid",
     "label": "CompactGrid"
   },
