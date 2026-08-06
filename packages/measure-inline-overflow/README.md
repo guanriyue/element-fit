@@ -6,7 +6,7 @@ English | [简体中文](./README.zh-CN.md)
 
 The usual `scrollWidth > clientWidth` check works in most cases, but browser-exposed dimensions may be rounded to integers. At the exact boundary where `text-overflow: ellipsis` appears, some content may already be hidden while JavaScript still reports equal `scrollWidth` and available width values.
 
-This package keeps the regular dimension comparison as its fast path and uses the Range API for a higher-precision fallback when both dimensions are strictly equal.
+This package keeps the regular dimension comparison as its fast path and uses the Range API for a higher-precision fallback when the result enters the one-pixel integer precision boundary.
 
 ## Usage
 
@@ -16,7 +16,7 @@ import { measureInlineOverflow } from '@guanriyue/measure-inline-overflow';
 const overflow = measureInlineOverflow(contentElement);
 ```
 
-By default, the available width comes from the Content element's `clientWidth`.
+By default, Content is also the Container. The fast path compares Content's `scrollWidth` with its `clientWidth`, while the Range fallback uses Content's content-box width. Both paths therefore keep the same box-model semantics when Content itself has inline padding.
 
 ### Container
 
@@ -28,7 +28,7 @@ const overflow = measureInlineOverflow(contentElement, {
 });
 ```
 
-The function uses the Container's `clientWidth` and subtracts `padding-inline-start` and `padding-inline-end` to obtain its content box width.
+The function uses the Container's `clientWidth` and subtracts `padding-inline-start` and `padding-inline-end` to obtain its content-box width. Explicitly passing `container: contentElement` has the same semantics as omitting `container`.
 
 ### Known Width
 
@@ -37,11 +37,11 @@ If ResizeObserver or another layout system already provides the available width,
 ```ts
 const overflow = measureInlineOverflow(contentElement, {
   container: rootElement,
-  availableWidth: resizeObserverEntry.contentBoxSize[0].inlineSize,
+  containerContentBoxWidth: resizeObserverEntry.contentBoxSize[0].inlineSize,
 });
 ```
 
-`availableWidth` takes precedence over `container`. When neither option is provided, the function uses Content's own `clientWidth`.
+`containerContentBoxWidth` must be a finite, non-negative number describing the resolved Container's content-box width. Container still determines whether Content clips itself or receives its available space from a separate element, so these two options do not override one another.
 
 ### Skip Range Fallback
 
@@ -49,21 +49,23 @@ The Range fallback is enabled by default. It can be skipped when comparing the r
 
 ```ts
 const overflow = measureInlineOverflow(contentElement, {
-  skipRangeFallback: true,
+  disableRangeFallback: true,
 });
 ```
+
+When the Range fallback is disabled, the function directly evaluates `scrollWidth > availableWidth` and does not apply the one-pixel precision boundary. The `1px` boundary only decides when Range takes over; it is not an epsilon for the regular comparison.
 
 ## Measurement
 
 The function first compares Content's `scrollWidth` with the resolved available width:
 
 ```text
-scrollWidth > availableWidth  -> true
-scrollWidth < availableWidth  -> false
-scrollWidth = availableWidth  -> Range fallback
+scrollWidth - availableWidth >= 1  -> true
+scrollWidth - availableWidth <= -1 -> false
+-1 < difference < 1               -> Range fallback
 ```
 
-When both dimensions are strictly equal, Content is not empty, and `skipRangeFallback` is not set, the function selects all Content descendants and compares `range.getBoundingClientRect().width` with the available width.
+When the result is within the boundary, Content is not empty, and `disableRangeFallback` is not set, the function selects all Content descendants and compares `range.getBoundingClientRect().width` with the Container's content-box width. This boundary also covers rounding differences when an integer `scrollWidth` is compared with a fractional ResizeObserver width.
 
 Range can measure text, elements, and mixed content in a regular single-line flow. Unlike approaches that clone a node, insert it into the document, measure it, and then remove it, Range does not mutate the DOM or introduce rendering work caused by mounting a temporary node. Reading DOM geometry may still require the browser to synchronously update layout, so call this function during an intentional measurement phase.
 
@@ -73,8 +75,8 @@ Range can measure text, elements, and mixed content in a regular single-line flo
 - The function does not observe size or content changes. Callers decide when to measure again.
 - A Range bounding rect is not the intrinsic width of an arbitrary DOM subtree.
 - Margins, pseudo-elements, positioning, transforms, and multiline layouts are outside the reliable scope of the Range fallback.
-- Differences caused by Content padding across measurement models are not handled separately yet.
-- When supplied by the caller, `availableWidth` is not checked for freshness against the current layout.
+- When Content and Container are separate elements, Content's own padding, border, and margin are not normalized separately. Content should represent the actual content width that must fit in the Container's content box.
+- When supplied by the caller, `containerContentBoxWidth` is not checked for freshness against the current Container layout.
 - Browser version, operating system fonts, and zoom settings may affect measurements near the boundary.
 
 ## Related Discussions
@@ -83,7 +85,3 @@ Range can measure text, elements, and mixed content in a regular single-line flo
 - [Stack Overflow: Wrong ellipsis detection with scrollWidth when text length is close to width](https://stackoverflow.com/questions/71440290/wrong-elipsis-detection-with-scrollwidth-when-text-length-is-close-to-width) presents an alternative that clones the content, inserts a hidden node, measures it, and removes it, while noting the cost of the extra DOM operations.
 - [Chromium issue 41468858](https://issues.chromium.org/issues/41468858) tracks related discussion for Chromium.
 - [Mozilla bug 1250824: Scroll Width wrong on element with overflow:hidden + text-overflow: ellipsis](https://bugzilla.mozilla.org/show_bug.cgi?id=1250824) records a related `scrollWidth` and ellipsis issue in Firefox.
-
-## Status
-
-A public demo and a complete test suite are not available yet.
