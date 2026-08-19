@@ -1,0 +1,55 @@
+---
+description: OverflowList 会保留能够放入当前空间的操作，并把尾部操作数据交给自定义的溢出渲染器。
+outline: true
+pageType: doc
+---
+
+# OverflowList
+
+`OverflowList` 用于单行操作列表。它把可以直接展示的操作声明为 `Item`，空间不足时隐藏 DOM 顺序末尾连续的 Item，并通过 `Overflow` 把对应的 `data` 交给调用方。Dropdown、菜单项和交互方式均不由组件内置。
+
+`Accessory` 用来声明仅在存在溢出 Item 时展示的真实布局元素，例如 Dropdown Trigger。Accessory 的内容和宽度完全由调用方决定；组件会把它挂载到真实布局中测量，不要求提前声明固定宽度。
+
+下面的工具栏可以连续调整宽度、条件渲染 Item，并切换按钮文案长度。空间不足时，尾部操作会进入省略号菜单；空间恢复后，它们会重新出现在工具栏中。
+
+```tsx file="<root>/src/demos/overflow-list/actions.tsx" preview
+
+```
+
+## 组合方式
+
+```tsx
+<OverflowList>
+  <OverflowList.Item data={dataA}>Item A</OverflowList.Item>
+  <OverflowList.Item data={dataB}>Item B</OverflowList.Item>
+
+  <OverflowList.Overflow<Action>>
+    {({ overflowItems }) => (
+      <Dropdown>
+        <OverflowList.Accessory asChild>
+          <Dropdown.Trigger>More</Dropdown.Trigger>
+        </OverflowList.Accessory>
+
+        <Dropdown.Content>
+          {overflowItems.map(renderAction)}
+        </Dropdown.Content>
+      </Dropdown>
+    )}
+  </OverflowList.Overflow>
+</OverflowList>
+```
+
+`Item.data` 可以是任意业务数据。可见结果始终是 DOM 顺序的连续前缀，隐藏部分按照相同顺序出现在 `overflowItems` 中。隐藏 Item 会渲染为 `null`，因此内部状态、焦点和未受控表单状态不会保留。
+
+`Overflow` 本身不产生 DOM。没有溢出时，它的 render function 仍会收到空数组；测量期间它也可能收到候选结果，因此 render function 应保持为纯渲染。
+
+Accessory 可以有多个，并且总是共同显示或隐藏。没有溢出时 Accessory 渲染为 `null`；需要测量时，它会短暂以不可见、不可交互的状态参与真实布局。如果隐藏全部 Item 后 Accessory 仍然放不下，组件会保留 Accessory 展示。
+
+## 布局边界
+
+- Root 应是不换行的横向布局，并通过自己的 content box 表达可用宽度。
+- Item 和 Accessory 最终渲染出的 HTMLElement 必须是 Root 的直接子节点。
+- Item 通常应设置为不可收缩，例如使用 `shrink-0`，否则浏览器会先压缩 Item，再由组件判断是否溢出。
+- 推荐使用 Root 的 `gap` 表达间距。首尾 margin、绝对定位、transform、负 margin 和独立 Separator 不属于稳定测量模型。
+- `direction: ltr` 和 `direction: rtl` 都可以使用，但优先级始终由 DOM 顺序决定。CSS `order` 或 `row-reverse` 不会改变组件的隐藏顺序。
+- 隐藏 Item 没有 DOM。如果只有隐藏 Item 因外部样式变化而缩小，需要改变对应 `data`/key、Root 尺寸或重新挂载列表来触发重新测量。

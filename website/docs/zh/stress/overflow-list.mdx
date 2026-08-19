@@ -1,0 +1,15 @@
+---
+description: OverflowList 大量实例下的测量与条件渲染性能观测页面。
+outline: false
+pageType: doc-wide
+---
+
+import { OverflowListStressTest } from '@/stress-tests/overflow-list';
+
+# OverflowList 压力测试
+
+页面可以渲染 10、20、30、50、100、200、300 或 500 个 `OverflowList` 实例。可以批量改变操作文案、条件增删操作项、切换容器宽度或持续缩放，观察同步布局测量和 overflow 数据更新时的 FPS 变化。
+
+当前组件没有对应的纯 CSS 行为基线，因此本页面只展示组件实现。每个 Accessory 都使用宽度恒定的省略号按钮，溢出数量只写入无障碍标签和原生 title，不参与宽度计算。
+
+<OverflowListStressTest />

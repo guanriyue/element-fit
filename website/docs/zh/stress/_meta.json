@@ -16,6 +16,11 @@
   },
   {
     "type": "file",
+    "name": "overflow-list",
+    "label": "OverflowList"
+  },
+  {
+    "type": "file",
     "name": "inline-overflow",
     "label": "InlineOverflow"
   },
