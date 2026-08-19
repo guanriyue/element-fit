@@ -1,3 +1,4 @@
+import { flushSync } from 'react-dom';
 import { createMicrotaskScheduler } from './createMicrotaskScheduler.ts';
 import { reportTaskError } from './reportTaskError.ts';
 
@@ -8,6 +9,11 @@ import { reportTaskError } from './reportTaskError.ts';
  * `write`，然后进入下一个阶段。
  */
 export type LayoutTaskStage = {
+  /**
+   * 当前阶段的写操作会更新 React 外部 Store，需要与同阶段的其他写操作
+   * 一起放入一次 flushSync。
+   */
+  flushSync?: boolean;
   read?: () => void;
   write?: () => void;
 };
@@ -134,7 +140,7 @@ export const createLayoutTaskScheduler = (): LayoutTaskScheduler => {
     for (const runningTask of batch) {
       stageCount = Math.max(
         stageCount,
-        runningTask.plan?.stages.length ?? 0,
+        runningTask.plan?.stages.length || 0,
       );
     }
 
@@ -146,11 +152,22 @@ export const createLayoutTaskScheduler = (): LayoutTaskScheduler => {
         );
       }
 
-      for (const runningTask of batch) {
-        runOperation(
-          runningTask,
-          runningTask.plan?.stages[stageIndex]?.write,
-        );
+      const write = () => {
+        for (const runningTask of batch) {
+          runOperation(
+            runningTask,
+            runningTask.plan?.stages[stageIndex]?.write,
+          );
+        }
+      };
+      const shouldFlushSync = batch.some((runningTask) => {
+        return runningTask.plan?.stages[stageIndex]?.flushSync;
+      });
+
+      if (shouldFlushSync) {
+        flushSync(write);
+      } else {
+        write();
       }
 
       for (const runningTask of batch) {

@@ -76,6 +76,7 @@ export default defineConfig({
         'FitSwitch/index': resolve(root, 'src/FitSwitch/index.ts'),
         'InlineOverflow/index': resolve(root, 'src/InlineOverflow/index.ts'),
         'LineClamp/index': resolve(root, 'src/LineClamp/index.ts'),
+        'OverflowList/index': resolve(root, 'src/OverflowList/index.ts'),
         'Textarea/index': resolve(root, 'src/Textarea/index.ts'),
       },
       formats: ['es'],

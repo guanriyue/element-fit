@@ -27,6 +27,10 @@
       "types": "./src/FitSwitch/index.ts",
       "import": "./src/FitSwitch/index.ts"
     },
+    "./overflow-list": {
+      "types": "./src/OverflowList/index.ts",
+      "import": "./src/OverflowList/index.ts"
+    },
     "./compact-grid": {
       "types": "./src/CompactGrid/index.ts",
       "import": "./src/CompactGrid/index.ts"
@@ -81,6 +85,10 @@
       "./fit-switch": {
         "types": "./dist/FitSwitch/index.d.ts",
         "import": "./dist/FitSwitch/index.js"
+      },
+      "./overflow-list": {
+        "types": "./dist/OverflowList/index.d.ts",
+        "import": "./dist/OverflowList/index.js"
       },
       "./compact-grid": {
         "types": "./dist/CompactGrid/index.d.ts",
