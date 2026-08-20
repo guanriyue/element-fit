@@ -4,8 +4,19 @@ import { defineConfig } from '@rspress/core';
 import { pluginPreview } from '@rspress/plugin-preview';
 import { pluginTwoslash } from '@rspress/plugin-twoslash';
 
+const normalizeBase = (value = '/') => {
+  if (value === '/') {
+    return '/';
+  }
+
+  return `/${value.replace(/^\/|\/$/g, '')}/`;
+};
+
+const base = normalizeBase(process.env.RSPRESS_BASE);
+
 export default defineConfig({
   root: path.join(__dirname, 'docs'),
+  base,
   title: 'Element Fit',
   description: 'Element Fit documentation.',
   lang: 'en',
