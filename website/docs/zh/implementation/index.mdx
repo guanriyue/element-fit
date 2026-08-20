@@ -1,0 +1,22 @@
+---
+description: Element Fit 的测量模型、调度机制与组件算法说明。
+outline: true
+pageType: doc
+---
+
+# 实现原理
+
+本栏目记录 Element Fit 在浏览器测量、状态失效、任务调度和布局算法上的设计选择。它用于解释组件为什么会表现出指南中描述的行为，不承担公共 API 参考的职责。
+
+组件的属性、data attribute、样式职责和使用边界仍以[组件指南](../guide/)为准。希望观察大量实例或对比实验实现时，可以进入[实验室](../lab/)。
+
+## 内容范围
+
+后续技术内容按照以下主题组织：
+
+- **测量与失效**：ResizeObserver、MutationObserver、content box、border box、几何缓存，以及什么变化会使缓存失效。
+- **布局任务调度**：DOM read/write stage、视窗优先级、React 同步提交，以及 forced reflow 的来源。
+- **组件算法**：记录 InlineOverflow、LineClamp、OverflowList 等组件特有的判断过程和精度处理。
+- **平台边界**：浏览器 API 精度、不可观测的 computed style 变化，以及实现选择对应的性能取舍。
+
+只有当一项内容需要解释内部算法或浏览器行为时，才应放入本栏目。用户为了正确使用组件必须知道的约束，应继续保留在对应的 Guide 页面中。

@@ -1,0 +1,28 @@
+---
+description: 观察 Element Fit 在批量渲染、连续变化和替代实现下的布局表现。
+outline: false
+pageType: doc-wide
+---
+
+# 实验室
+
+实验室用于在浏览器中观察大量组件同时渲染、内容变化和容器宽度变化时的测量表现，也用于保存尚未成为公共组件的替代实现。这里的页面不是功能入门示例，观察结果也不代表固定的性能基准。
+
+每个组件页面都可以调整渲染数量；具备可比基础实现的页面还可以在组件与基础渲染之间切换。页面右上角的 FPS 指示器用于辅助观察交互期间的帧率变化。
+
+## 性能观测
+
+- [CompactGrid](./compact-grid)
+- [FitSwitch](./fit-switch)
+- [OverflowList](./overflow-list)
+- [InlineOverflow](./inline-overflow)
+- [LineClamp](./line-clamp)
+- [Textarea](./textarea)
+
+## 综合场景
+
+[综合业务场景](./real-world) 将多个自适应组件放入卡片、表格和详情面板中，用于观察更接近业务页面的混合布局。
+
+## 实验实现
+
+[OverflowList DOM 调度实验](./overflow-list-dom)使用与正式组件相近的布局算法，但通过直接 DOM 写入控制 Item 和 Accessory，仅用于比较不同提交机制的性能与约束，不属于公共 API。

@@ -4,7 +4,11 @@
     "link": "/guide/"
   },
   {
-    "text": "压力测试",
-    "link": "/stress/"
+    "text": "实现原理",
+    "link": "/implementation/"
+  },
+  {
+    "text": "实验室",
+    "link": "/lab/"
   }
 ]

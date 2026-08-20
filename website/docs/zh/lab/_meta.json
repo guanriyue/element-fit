@@ -21,11 +21,6 @@
   },
   {
     "type": "file",
-    "name": "overflow-list-dom",
-    "label": "OverflowList DOM（实验）"
-  },
-  {
-    "type": "file",
     "name": "inline-overflow",
     "label": "InlineOverflow"
   },
@@ -43,5 +38,10 @@
     "type": "file",
     "name": "real-world",
     "label": "综合业务场景"
+  },
+  {
+    "type": "file",
+    "name": "overflow-list-dom",
+    "label": "实验实现：OverflowList DOM"
   }
 ]

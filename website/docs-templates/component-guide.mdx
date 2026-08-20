@@ -1,0 +1,113 @@
+---
+description: <用一句话说明组件解决的问题。>
+outline: true
+pageType: doc
+---
+
+# ComponentName
+
+用一到两段说明组件解决什么问题、组件负责什么，以及哪些视觉和交互由调用方负责。
+
+## 适用场景
+
+- 列出典型的适用场景。
+- 说明与相似组件的区别。
+- 明确不适用的场景。
+
+## 导入
+
+```tsx
+import { ComponentName } from '@guanriyue/react-fit/component-name';
+```
+
+## 基础用法
+
+先用一个尽可能小、可以直接复制的示例建立基本心智。
+
+```tsx file="<root>/src/demos/component-name/basic.tsx" preview
+
+```
+
+## 组合结构
+
+仅 Compound Component 需要本节。说明各 Part 的职责、React 层级和最终 DOM 层级约束；简单组件删除本节。
+
+```tsx
+<ComponentName>
+  <ComponentName.Part />
+</ComponentName>
+```
+
+## 功能主题
+
+按照组件的真实能力组织后续章节，不需要为了统一模板制造空章节。每个主题优先说明用户可感知的行为，再提供交互示例。
+
+## 布局与样式
+
+- 组件提供哪些必要样式。
+- 哪些视觉样式由调用方控制。
+- 默认渲染元素与 `asChild` 的使用条件。
+- flex、grid、box、gap 和 margin 等布局约束。
+- 调用方 `style` 与组件必要样式的合并优先级。
+
+## 状态与重新测量
+
+- 首次渲染和首次可信测量完成前的状态。
+- 哪些属性、DOM、内容或尺寸变化会触发重新测量。
+- 哪些外部变化无法被稳定观测。
+- 状态切换会更新 attribute、移动节点、卸载节点还是重新挂载节点。
+
+本节只描述使用者可以观察到的行为。调度阶段、缓存算法和浏览器布局读取应移动到“实现原理”，并在这里提供链接。
+
+## API 参考
+
+### Root
+
+**默认元素：** `div`  
+**Ref：** `HTMLDivElement`  
+**支持 `asChild`：** 是 / 否
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `prop` | `type` | `default` | 说明属性语义、优先级和无效输入行为。 |
+
+补充说明原生属性是否透传，以及 `className`、`style` 和事件处理函数的行为。
+
+#### Data attributes
+
+| Attribute | Value | Condition |
+| --- | --- | --- |
+| `data-state` | `value` | attribute 出现或取该值的条件。 |
+
+#### CSS variables
+
+只有组件确实公开 CSS variable 时保留本节。
+
+### Part
+
+Compound Component 的各个 Part 使用相同结构继续描述；简单组件删除本节。
+
+## 边界
+
+### 布局边界
+
+- 列出超出组件稳定测量或布局模型的情况。
+
+### 状态边界
+
+- 列出卸载、重新挂载、焦点、未受控状态和状态副本等行为。
+
+### 无障碍与焦点
+
+- 组件提供了哪些语义或交互保护。
+- 哪些 ARIA、键盘交互、Tooltip 或焦点恢复由调用方负责。
+
+在无障碍内容统一整理完成前，只在这份内部模板中保留检查项，不在正式页面发布空标题或“待补”文字。
+
+## 相关内容
+
+- [相关组件](./related-component)
+- [实现原理](../implementation/related-topic)
+- [实验室](../lab/component-name)
