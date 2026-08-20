@@ -1,0 +1,22 @@
+---
+description: 使用普通 DOM 写入驱动的 OverflowList 实验实现压力测试。
+outline: false
+pageType: doc-wide
+---
+
+import { OverflowListDomStressTest } from '@/stress-tests/overflow-list-dom';
+
+# OverflowList DOM 调度实验
+
+这是仅存在于 website 的内部压力测试实现，不属于 `@guanriyue/react-fit` 公共 API。它与正式 OverflowList
+使用相同的几何算法、布局任务批处理和视窗优先级，但测量 stage 只直接修改 DOM，不调用 React
+`flushSync`。
+
+实验中的 Item 和 Accessory 始终保留 DOM，通过原生 `hidden` 属性进入或离开布局。Accessory 必须始终渲染，
+并使用宽度恒定的省略号按钮；它的测量宽度不依赖 `overflowItems` 的最新 React render 结果。这些约束是实验
+能够避开同步 React commit 的前提，不代表正式组件的 API 约定。
+
+页面提供与正式 OverflowList 压力测试相同的实例数量、长短文案、操作项增减、容器宽窄切换和连续宽度动画，
+用于观察持久 DOM 与 React 条件挂载两种实现的性能差异。
+
+<OverflowListDomStressTest />

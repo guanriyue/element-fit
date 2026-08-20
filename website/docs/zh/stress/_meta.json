@@ -21,6 +21,11 @@
   },
   {
     "type": "file",
+    "name": "overflow-list-dom",
+    "label": "OverflowList DOM（实验）"
+  },
+  {
+    "type": "file",
     "name": "inline-overflow",
     "label": "InlineOverflow"
   },
