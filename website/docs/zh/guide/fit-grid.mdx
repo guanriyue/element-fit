@@ -1,23 +1,161 @@
 ---
-description: FitGrid 是基于 CSS Grid 的简易封装，会根据可用空间自适应列数。
+description: FitGrid 使用 CSS Grid 根据 Item 的最小可用宽度自动调整列数。
 outline: true
 pageType: doc
 ---
 
 # FitGrid
 
-`FitGrid` 是对 CSS Grid 自适应列能力的简易封装。它使用 `minItemWidth` 表达每一列可接受的最小宽度，并由浏览器根据当前元素的可用空间自动调整列数。
+`FitGrid` 是一个轻量的 CSS Grid 布局组件。它使用 `minItemWidth` 表达每一列可以接受的最小宽度，再由浏览器根据 FitGrid 当前获得的空间自动决定列数。
 
-组件不会通过 JavaScript 测量容器，也不会监听尺寸变化或报告当前列数。它只把 `minItemWidth`、列数限制和间距组合成 `grid-template-columns` 等必要的 Grid 样式，因此容器宽度变化时的布局更新完全由 CSS Grid 完成。
+组件不读取 DOM 尺寸，不监听 Resize，也不在容器变化时触发 React 状态更新。React 只负责根据 props 生成 `grid-template-columns`、间距和 Item 放置样式；后续的响应式布局完全由 CSS Grid 完成。
 
-下面的查询表单最多显示四列。调整容器宽度，可以观察字段和操作按钮如何在不依赖 viewport breakpoint 的情况下自动换列。最后一个操作区使用 `FitGrid.Item pin="row-end"` 放在当前行末尾。
+## 适用场景
+
+`FitGrid` 适合过滤表单、设置面板和卡片列表等布局：各项可以共享一个最小可用宽度，但整个布局可能出现在主内容区、侧栏、弹窗等宽度不同的容器中。
+
+它尤其适合以下情况：
+
+- 希望布局响应元素自身的可用宽度，而不是 viewport breakpoint。
+- 各列适合均分剩余空间，并且可以使用同一个最小列宽。
+- 只需要浏览器完成自动换列，不需要在 React 中读取当前列数。
+- 少数 Item 需要跨列或固定到当前行末尾。
+
+如果需要知道当前实际列数，或者需要根据紧凑状态把额外内容移动到另一个节点，应使用在 FitGrid 布局基础上扩展的 [CompactGrid](./compact-grid)。
+
+## 导入
+
+```tsx
+import { FitGrid } from '@guanriyue/react-fit/fit-grid';
+```
+
+## 基础用法
+
+下面的查询表单最多显示四列。调整容器宽度，可以观察字段和操作区如何在不依赖 viewport breakpoint 的情况下自动换列。最后一个操作区使用 `FitGrid.Item pin="row-end"` 放在当前行末尾。
 
 ```tsx file="<root>/src/demos/fit-grid/query-form.tsx" preview
 
 ```
 
-## 适用范围
+## Item 布局
 
-`FitGrid` 适合过滤表单、设置面板和卡片列表等各项具有相同最小宽度的布局。`minColumns` 和 `maxColumns` 可以限制列数范围，`colGap` 和 `rowGap` 用于控制间距。
+FitGrid 的普通元素子节点会自然成为 Grid Item。只有需要声明跨列、固定到行末尾，或者需要一个额外包装元素时，才需要使用 `FitGrid.Item`。
 
-如果布局需要知道当前实际列数、根据状态移动内容，或让额外操作在不同节点之间切换位置，则需要在 CSS Grid 之外增加状态管理；例如可以使用在 `FitGrid` 基础上扩展的 `CompactGrid`。
+### 跨列
+
+`colSpan` 接受正整数或 `'full'`。数字值会生成对应的 `grid-column: span n`，`'full'` 会让 Item 从第一条网格线延伸到最后一条网格线。
+
+```tsx
+<FitGrid minItemWidth="12rem">
+  <FitGrid.Item colSpan={2}>跨两列</FitGrid.Item>
+  <FitGrid.Item colSpan="full">占满整行</FitGrid.Item>
+</FitGrid>
+```
+
+FitGrid 不会根据当前实际列数收敛数字 `colSpan`。如果声明的跨度大于当前显式列数，CSS Grid 可能创建隐式列或产生与预期不同的自动放置结果。需要让越界跨度自动退化为整行时，可以使用 `CompactGrid.Item`。
+
+### 固定到行末尾
+
+`pin="row-end"` 会把 Item 放到当前显式 Grid 的最后一列，适合查询表单末尾的提交、重置等操作区。
+
+```tsx
+<FitGrid.Item pin="row-end">
+  <button type="submit">查询</button>
+</FitGrid.Item>
+```
+
+`pin` 预期用于当前布局组的最后一个子节点。把中间节点固定到行末尾后，其余 Item 如何自动放置由 CSS Grid 决定。如果同时传入 `pin` 和 `colSpan`，`pin` 优先，并在开发环境给出警告。
+
+## 布局与样式
+
+### 列数与列宽
+
+FitGrid 使用 `repeat(auto-fit, minmax(..., 1fr))` 生成列。`minItemWidth` 给出通常情况下的最小 track size，实际列宽继续由 Grid 均分。
+
+- `minColumns` 让布局尝试保留至少指定数量的列。空间不足时，列宽可以小于 `minItemWidth`。
+- `maxColumns` 通过增大最小 track size，限制当前空间中最多可以形成的列数。
+- 同时设置两者时，生成的 track size 会同时考虑最小列数、最大列数、`minItemWidth` 和列间距。
+- `auto-fit` 会折叠没有 Item 的空 track，因此最终可见列数仍然受实际子节点数量影响。
+
+`minColumns` 和 `maxColumns` 只接受正整数。非法值会被忽略，并在开发环境给出警告。如果 `maxColumns` 小于 `minColumns`，组件会给出警告，但仍使用两个原始值生成 Grid 公式。
+
+### 必要样式
+
+Root 会以内联样式设置以下属性：
+
+- `display: grid`
+- `grid-template-columns`
+- `column-gap`
+- `row-gap`
+
+这些属性是 FitGrid 布局模型的一部分，会覆盖调用方通过 `style` 传入的同名属性。其他行内样式会正常保留。
+
+数字形式的 `minItemWidth`、`colGap` 和 `rowGap` 按像素处理；字符串会作为 CSS 长度直接使用，因此可以传入 `rem`、CSS variable 或 `calc()`。
+
+## 布局更新
+
+容器宽度变化时，浏览器会直接重新计算 CSS Grid，不经过 ResizeObserver、React state 或组件调度器。修改 `minItemWidth`、列数限制或间距 props 时，React 会生成新的行内 Grid 样式。
+
+FitGrid 没有内部布局状态，不提供当前列数 callback，也不暴露状态 data attribute。组件在首次渲染时就会输出完整的 Grid 样式，无需等待尺寸测量。
+
+## API 参考
+
+### Root
+
+包含整个自适应 Grid，默认渲染为 `div`。
+
+**默认元素：** `div`  
+**Ref：** `HTMLDivElement`  
+**支持 `asChild`：** 是
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `minItemWidth` | `number \| string` | 必填 | 每个 Grid Item 在减少列数前通常应保持的最小宽度；数字按 px 处理。 |
+| `minColumns` | `number` | `undefined` | 尝试保留的最小列数，只接受正整数。 |
+| `maxColumns` | `number` | `undefined` | 当前 Grid 最多创建的列数，只接受正整数。 |
+| `colGap` | `number \| string` | `0` | 列间距；数字按 px 处理。 |
+| `rowGap` | `number \| string` | `colGap` | 行间距；数字按 px 处理。 |
+| `asChild` | `boolean` | `false` | 将 FitGrid 的 props、ref 和必要样式合并到唯一 child。 |
+
+除上述属性外，Root 支持 `div` 的原生属性。`className`、事件处理函数和非布局行内样式会转发给最终元素。使用 `asChild` 时，唯一 child 必须能够接收 props 和 ref。
+
+FitGrid 不暴露状态 data attribute。
+
+### Item
+
+为单个 Grid Item 声明跨列或行末放置方式，也可以使用命名导出的 `FitGridItem`。默认渲染为 `div`。
+
+```tsx
+import { FitGrid, FitGridItem } from '@guanriyue/react-fit/fit-grid';
+```
+
+**默认元素：** `div`  
+**Ref：** `HTMLDivElement`  
+**支持 `asChild`：** 是
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `colSpan` | `number \| 'full'` | `undefined` | 跨越指定列数，或者使用 `'full'` 占满整行；数字只接受正整数。 |
+| `pin` | `'row-end'` | `undefined` | 将 Item 放到当前显式 Grid 的最后一列；优先于 `colSpan`。 |
+| `asChild` | `boolean` | `false` | 将 Item 的 props、ref 和放置样式合并到唯一 child。 |
+
+除上述属性外，Item 支持 `div` 的原生属性。`colSpan` 或 `pin` 生成的 `grid-column` 会覆盖调用方通过 `style` 传入的同名属性；其他行内样式正常保留。
+
+FitGrid.Item 不暴露状态 data attribute。
+
+## 边界
+
+- FitGrid 只根据一个共享的 `minItemWidth` 生成列，不支持为每个 Item 声明不同的最小 track size。
+- 组件不读取或报告当前实际列数，也不会根据列数条件渲染内容。
+- 普通子节点的 `grid-column` 完全由调用方负责；FitGrid 不读取这些样式并修正其他 Item。
+- 数字 `colSpan` 超过当前显式列数时不会自动退化为整行。
+- `pin="row-end"` 预期用于布局组末尾；对中间节点使用可能影响后续 Item 的自动放置。
+- FitGrid 把每个直接子节点视为一个完整 Grid Item。字段内部的 label、control 和提示信息应由该 Item 自己布局。
+
+## 相关内容
+
+- [CompactGrid](./compact-grid)：在相同 Grid 逻辑上增加当前列数观察，以及 Extra 与 ExtraSlot 的紧凑布局。
