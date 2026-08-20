@@ -26,7 +26,6 @@ describe('FitGrid', () => {
 
     const grid = screen.getByTestId('grid');
 
-    expect(grid).toHaveClass('rf-fit-grid');
     expect(grid).toHaveStyle({
       display: 'grid',
       columnGap: '0px',
@@ -149,7 +148,6 @@ describe('FitGrid', () => {
     );
 
     expect(element).toBeInstanceOf(HTMLDivElement);
-    expect(element).toHaveClass('rf-fit-grid');
   });
 });
 
@@ -234,6 +232,5 @@ describe('FitGridItem', () => {
     );
 
     expect(element).toBeInstanceOf(HTMLDivElement);
-    expect(element).toHaveClass('rf-fit-grid-item');
   });
 });

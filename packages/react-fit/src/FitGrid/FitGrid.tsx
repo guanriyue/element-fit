@@ -1,5 +1,4 @@
 import { Primitive } from '@radix-ui/react-primitive';
-import { clsx } from 'clsx';
 import { forwardRef } from 'react';
 import { getFitGridTemplateColumns } from '../_internal/getFitGridTemplateColumns.ts';
 import { isPositiveInteger } from '../_internal/isPositiveInteger.ts';
@@ -70,8 +69,7 @@ export interface FitGridItemProps extends PrimitiveDivProps {
 }
 
 const FitGridRoot = forwardRef<HTMLDivElement, FitGridProps>((props, ref) => {
-  const { minItemWidth, minColumns, maxColumns, colGap, rowGap, className, style, ...restProps } =
-    props;
+  const { minItemWidth, minColumns, maxColumns, colGap, rowGap, style, ...restProps } = props;
 
   const minColumnsPositive = isPositiveInteger(minColumns);
   const maxColumnsPositive = isPositiveInteger(maxColumns);
@@ -122,19 +120,14 @@ const FitGridRoot = forwardRef<HTMLDivElement, FitGridProps>((props, ref) => {
   };
 
   return (
-    <Primitive.div
-      {...restProps}
-      ref={ref}
-      className={clsx('rf-fit-grid', className)}
-      style={fitGridStyle}
-    />
+    <Primitive.div {...restProps} ref={ref} style={fitGridStyle} />
   );
 });
 
 FitGridRoot.displayName = 'FitGrid' as const;
 
 export const FitGridItem = forwardRef<HTMLDivElement, FitGridItemProps>((props, ref) => {
-  const { colSpan, pin, className, style, ...restProps } = props;
+  const { colSpan, pin, style, ...restProps } = props;
   const colSpanFull = colSpan === 'full';
   const colSpanPositive = isPositiveInteger(colSpan);
 
@@ -166,12 +159,7 @@ export const FitGridItem = forwardRef<HTMLDivElement, FitGridItemProps>((props, 
   }
 
   return (
-    <Primitive.div
-      {...restProps}
-      ref={ref}
-      className={clsx('rf-fit-grid-item', className)}
-      style={itemStyle}
-    />
+    <Primitive.div {...restProps} ref={ref} style={itemStyle} />
   );
 });
 
