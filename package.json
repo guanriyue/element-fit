@@ -27,7 +27,7 @@
     "url": "https://github.com/guanriyue/element-fit/issues"
   },
   "engines": {
-    "node": ">=22.11.0"
+    "node": ">=22.13.0"
   },
   "license": "MIT",
   "packageManager": "pnpm@11.9.0",
