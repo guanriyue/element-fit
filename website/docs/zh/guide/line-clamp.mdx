@@ -1,12 +1,23 @@
 ---
-description: LineClamp 用于限制 inline 内容的可见行数，并在内容确实超过限制时渲染 suffix。
+description: LineClamp 限制 inline 内容的可见行数，并在内容超过限制时组合自定义 Suffix。
 outline: true
 pageType: doc
 ---
 
 # LineClamp
 
-`LineClamp` 用于限制 inline 内容的可见行数，并在内容确实超过限制时渲染 suffix。组件只负责截断、overflow 测量和 suffix 布局；展开状态、按钮样式和交互行为由调用方控制。
+`LineClamp` 用于限制 inline 内容的可见行数，并在内容确实超过限制时渲染 Suffix。组件负责多行截断、overflow 测量和末行 Suffix 布局；展开状态、交互行为和视觉样式由调用方控制。
+
+## 适用场景
+
+LineClamp 适合文章摘要、描述文本、评论预览和其他需要展开入口的多行内容：
+
+- 收起时限制正文的可见行数。
+- 只在正文确实超过限制时展示“展开”、详情或其他提示。
+- 展开后继续保留“内容是否超过指定行数”的状态。
+- 正文主要由文本和普通 inline 节点组成。
+
+只需要固定行数裁剪、不需要 overflow 状态或 Suffix 时，可以直接使用 CSS line-clamp。复杂 block、bidi、ruby 或具有独立布局规则的富文本需要根据目标浏览器单独验证。
 
 ## 导入
 
@@ -16,71 +27,179 @@ import { LineClamp } from '@guanriyue/react-fit/line-clamp';
 
 ## 基础用法
 
-`expanded` 是受控状态。修改 `expanded` 只改变当前视觉展示，不会改变 `lines` 这个测量基准。下面的示例可以调整容器宽度和行数，并切换 clamp 与 expanded 状态，直接观察 `collapsed`、`expanded` 和 `unclamped`。
+`expanded` 是受控状态。修改 `expanded` 只切换当前展示方式，不会改变 `lines` 这个 overflow 测量基准。
+
+下面的示例可以调整容器宽度和行数，并切换收起、展开与禁用截断状态。
 
 ```tsx file="<root>/src/demos/line-clamp/basic.tsx" preview
 
 ```
 
-## 样式控制与 data-state
+内容不超过 `lines` 时，正文完整展示且不渲染 Suffix。内容超过限制时：
 
-Root 渲染为 `div`。组件不设置常态下的 `display`、`word-break`、`overflow-wrap` 或 `white-space`，正文的
-换行规则和视觉样式由开发者通过 `className`、`style` 或继承样式控制。下面同时挂载普通换行与
-`word-break: break-all` 两组实例，并通过 `data-[state=...]` 属性选择器为收起和展开状态设置不同颜色。
-两组实例共享宽度、行数和 expanded 状态，只有换行策略不同。
+- `expanded={false}`：正文限制为指定行数，Suffix 位于最后一个可见行附近。
+- `expanded={true}`：正文完整展示，Suffix 作为普通 inline 内容跟随在正文之后。
+
+LineClamp 不管理展开状态，也不为 Suffix 注入点击行为。按钮文案、事件和状态存储由调用方提供。
+
+## 布局状态
+
+Root 通过 `data-state` 暴露当前布局模式：
+
+| Value | Condition |
+| --- | --- |
+| `collapsed` | `lines` 是正整数并且 `expanded={false}`。 |
+| `expanded` | `lines` 是正整数并且 `expanded={true}`。 |
+| `unclamped` | `lines` 缺省或不是正整数。 |
+
+`data-state` 表示布局模式，不表示正文是否 overflow。即使内容没有超过限制，只要传入有效的 `lines` 且未展开，状态仍然是 `collapsed`。overflow 结果通过 `onOverflowChange` 获取。
+
+下面的示例使用 `data-state` 设置状态样式，并对比普通换行与 `word-break: break-all`：
 
 ```tsx file="<root>/src/demos/line-clamp/style-control.tsx" preview
 
 ```
 
-Root 的 `data-state` 有三个值：
-
-- `collapsed`：`lines` 是正整数，并且 `expanded={false}`。
-- `expanded`：`lines` 是正整数，并且 `expanded={true}`。
-- `unclamped`：`lines` 缺省或不是正整数，此时截断、overflow 测量和 suffix 均被禁用。
-
-收起状态下，组件仍会设置实现核心截断所需的 `display: -webkit-box`、`-webkit-box-orient: vertical`、
-`overflow: hidden` 和动态 `-webkit-line-clamp`。内部 Spacer 与 Suffix 的 float 样式也属于末行 suffix
-布局的一部分。Root 的 `style` 最后合并，因此可以覆盖这些属性，但覆盖后需要由开发者自行保证截断与
-测量语义一致。
-
 ## Overflow 状态
 
-`onOverflowChange` 会在首次可信测量完成后触发，并在测得的 overflow 状态变化时再次触发。这里的 overflow 表示内容超过 `lines` 基准，不表示展开后的当前 UI 正在被裁切。组件会监听内容变化，下面的示例可以通过 textarea 输入或一键切换长短文本来观察重新测量，也可以调整宽度和行数改变测量基准。
+`onOverflowChange` 在首次可信测量完成后调用，之后仅在测得的 overflow 布尔值变化时再次调用。overflow 表示正文超过 `lines` 基准，不表示展开后的当前 UI 仍在发生视觉裁切。
+
+改变 `expanded` 不会把 overflow 重置为 `false`。改变 `lines`、Root 可用宽度或正文内容会更新测量基准或使现有结果失效。
 
 ```tsx file="<root>/src/demos/line-clamp/overflow-state.tsx" preview
 
 ```
 
-## Inline 内容
+首次可信测量完成前，内部 overflow 为 `false`，Suffix 不渲染。大量实例中，远离视窗的测量任务可能稍后完成。
 
-`LineClamp` 接收 `children`，因此可以承载文本、链接、强调、`code`、`inline-block` 和 `<br />` 等 inline 内容。下面的示例可以条件渲染不同类型的 inline 节点，产生真实的正文 DOM mutation。复杂 inline box、强制换行和不同浏览器的 Range rect 可能带来边界差异。
+## Suffix
 
-```tsx file="<root>/src/demos/line-clamp/inline-content.tsx" preview
-
-```
-
-## 测量策略
-
-默认策略是 `in-place`，它直接读取当前 DOM 的行信息，不创建额外测量节点。`clone` 会临时克隆正文内容到隔离 DOM 中重新排版，代价是额外布局，但可以避开部分可见 suffix 对测量的干扰。下面两组实例共享宽度、行数、内容和 expanded 状态，唯一差异是测量策略。
-
-```tsx file="<root>/src/demos/line-clamp/measure-strategy.tsx" preview
-
-```
-
-## Suffix 形态
-
-收起状态下 suffix 会通过 float 布局放到最后一个可见行附近。它可以是提示、详情、跳转或展开入口，不必总是控制 `expanded`；也可以把提示和展开控制组合在同一个按钮上。示例可以切换长短 suffix，观察它对最后一行正文空间的影响。suffix 应该保持紧凑，建议高度不超过一行；较长或较高的 suffix 会参与最后一行排版，可能挤压正文。
+Suffix 可以是展开按钮、详情入口、状态提示或其他紧凑的 inline 内容。它只在 `lines` 有效并且正文 overflow 时渲染，并由组件提供的 `span` 包装。
 
 ```tsx file="<root>/src/demos/line-clamp/suffix.tsx" preview
 
 ```
 
-## 布局要点
+收起状态使用 float 把 Suffix 放在最后一个可见行附近。Suffix 会占用末行空间，因此应保持紧凑，高度通常不超过一行；较宽或较高的内容可能挤压正文，或者改变末行的视觉结果。
 
-- `lines` 不是正整数时，会禁用截断、overflow 测量和 suffix 渲染。
-- suffix 仅在测量结果为 overflow 时渲染。
-- 收起状态下 suffix 使用 float 影响最后一行布局；展开状态下 suffix 回到正文之后的普通 inline 位置。
-- 组件会监听内容变化，并在正文文本或子节点变化后重新测量；Root content box width 或 `lines` 变化时也会重新测量。
-- MutationObserver 不监听 attributes。仅修改 class、style、继承样式、字体或外部样式表时，如果 Root content box width 没有变化，也没有正文 DOM mutation，不保证重新测量。
-- `in-place` 当前只识别 `<br />` 形成的 hard line break；其他 CSS 或文本规则形成的强制换行可能需要改用 `clone` 或自定义方案。
+展开与收起状态使用不同的 Suffix 包装节点和 DOM 位置。切换 `expanded` 会重新挂载包装节点及其子树，Suffix 内部的组件状态、effect、未受控表单状态和 ref 不会跨越这次切换保留。需要保留的状态应提升到 LineClamp 外部。
+
+Suffix 不属于正文测量内容。修改 Suffix 不会改变“正文是否超过 `lines`”这个判断基准。
+
+## Inline 内容
+
+`children` 可以包含文本、链接、强调、`code`、`inline-block` 和 `<br />` 等 inline 内容。正文节点会按照浏览器的真实布局共同形成行信息。
+
+```tsx file="<root>/src/demos/line-clamp/inline-content.tsx" preview
+
+```
+
+复杂 inline box、强制换行和浏览器 Range rect 差异可能影响行数判断。默认测量策略能够识别 `<br />` 形成的 hard line break；其他由 CSS、保留换行符或 block-level box 形成的强制换行不属于相同的稳定边界。
+
+## 测量策略
+
+`measureStrategy` 提供两种正文 overflow 测量方式：
+
+| Strategy | Measurement | Characteristics |
+| --- | --- | --- |
+| `in-place` | 使用 Range 读取当前正文的行 rect。 | 默认值；不创建临时测量节点，结果直接来自当前 DOM。 |
+| `clone` | 把正文克隆到临时节点，以 Root content box width 重新排版。 | 不受可见 Suffix 直接干扰，但会创建临时 DOM 并增加一次布局。 |
+
+```tsx file="<root>/src/demos/line-clamp/measure-strategy.tsx" preview
+
+```
+
+### in-place
+
+`in-place` 使用 `Range.getClientRects()` 读取当前正文形成的布局片段，并按照纵向重叠关系合并为可见行。收起状态下，float Suffix 可能把最后一行的部分正文推到额外一行；组件会结合最后一个可见行和第一个隐藏行的宽度，判断额外行来自正文自身还是 Suffix 占用空间。
+
+该策略依赖浏览器对当前 DOM 暴露的 Range rect。复杂 inline box、bidi、ruby、atomic inline-level 元素和特殊换行规则可能产生浏览器差异。
+
+### clone
+
+`clone` 临时创建不可见的固定定位节点，只复制正文内容，并按照 Root 的 content box width 重新排版。测量节点通过 DOM API 创建和移除，不增加额外的 React 组件渲染。
+
+克隆节点不会复制运行时表单状态、canvas 绘制结果，也无法完整复现依赖原始 DOM 层级的选择器和布局关系。`clone` 是另一种测量取舍，不是对任意 DOM 和 CSS 的完整模拟。
+
+默认使用 `in-place`。当前正文无法通过 `in-place` 得到稳定结果时，可以尝试 `clone`；两种策略都不适合时，应为对应内容提供专用布局。
+
+运行时修改 `measureStrategy` 会切换测量 store，并为新策略重新连接 Root 和建立测量结果。不应在连续动画中频繁切换策略。
+
+## 样式与布局
+
+Root 固定渲染为 `div`。组件不设置常态下的 `word-break`、`overflow-wrap`、`white-space`、字体或行高，正文的换行规则和视觉样式由调用方提供。
+
+收起状态会设置完成核心截断所需的样式：
+
+- `display: -webkit-box`
+- `-webkit-box-orient: vertical`
+- `overflow: hidden`
+- 根据 `lines` 设置的 `-webkit-line-clamp`
+
+内部 Spacer 和 Suffix 还会使用 float 布局。调用方传入的 `style` 在内部样式之后合并，因此可以覆盖这些属性；覆盖 `display`、`overflow`、`WebkitBoxOrient` 或 `WebkitLineClamp` 后，需要自行保证截断和测量语义仍然成立。
+
+Root 应获得明确的 content box width。padding 可以用于视觉留白，组件使用扣除 padding 后的宽度测量正文。正文的行高应保持稳定，因为 Spacer 使用 Root content height 和 `1lh` 把 Suffix 推向最后一个可见行。
+
+## 观测与重新测量
+
+组件使用 ResizeObserver 读取 Root content box，并使用 MutationObserver 监听 Root subtree 中的文本和子节点变化。以下变化会更新或重新建立测量结果：
+
+- Root content box width 变化。
+- `lines` 变化。
+- 正文文本或子节点变化。
+- Root 元素重新挂载。
+- `measureStrategy` 变化。
+
+内部 Spacer、Suffix 和临时 clone 节点不属于正文 mutation。它们的挂载、卸载和内容变化不会让正文测量失效。
+
+MutationObserver 不观察 attributes。只修改 class、style、继承样式、字体、伪元素内容或外部样式表时，如果 Root content box width 没有变化，也没有正文 DOM mutation，组件不保证重新测量。
+
+组件会缓存最近一次宽度与 overflow 结果，并根据普通 inline 内容随可用宽度变化的单调关系复用结果。通过 container query、媒体查询或其他宽度相关规则同时改变正文内容或排版方式时，应保证这个单调关系仍然成立。
+
+## API 参考
+
+### Root
+
+渲染多行正文和可选 Suffix，默认并固定为 `div`。
+
+**默认元素：** `div`  
+**Ref：** `HTMLDivElement`  
+**支持 `asChild`：** 否
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `children` | `ReactNode` | 必填 | 参与截断和 overflow 测量的 inline 正文。 |
+| `lines` | `number` | `undefined` | 最大可见行数和 overflow 测量基准；不是正整数时禁用截断、测量和 Suffix。 |
+| `expanded` | `boolean` | `false` | 是否完整展示正文；不会改变 `lines` 测量基准。 |
+| `suffix` | `ReactNode` | `undefined` | 正文 overflow 时渲染的末行或文末内容。 |
+| `onOverflowChange` | `(overflow: boolean) => void` | `undefined` | 首次可信测量完成后调用，之后在 overflow 状态变化时调用。 |
+| `measureStrategy` | `'in-place' \| 'clone'` | `'in-place'` | 选择直接读取当前 DOM 或使用临时克隆节点测量。 |
+
+除上述属性外，Root 支持 `div` 的原生属性。调用方传入的 `style` 会覆盖同名内部样式。
+
+#### Data attributes
+
+| Attribute | Value | Condition |
+| --- | --- | --- |
+| `data-state` | `collapsed` | `lines` 有效且 `expanded` 为 `false`。 |
+| `data-state` | `expanded` | `lines` 有效且 `expanded` 为 `true`。 |
+| `data-state` | `unclamped` | `lines` 缺省或不是正整数。 |
+
+## 边界
+
+- `lines` 必须是正整数；其他值进入 `unclamped` 状态。
+- LineClamp 面向横向书写模式中的多行 inline 内容，不提供通用 block 子树截断。
+- Root 固定渲染为 `div`，不支持 `asChild`。
+- Suffix 仅在正文 overflow 时渲染，并在收起与展开切换时重新挂载。
+- 收起状态下的 Suffix 应保持紧凑，较高内容不属于稳定的末行布局。
+- `in-place` 只将 `<br />` 识别为 hard line break 边界。
+- `clone` 不完整复制运行时 DOM 状态和依赖原始层级的样式关系。
+- 复杂 inline box、bidi、ruby、block-level box 和浏览器 Range rect 差异需要在目标内容中验证。
+- 仅由 attribute、继承样式、字体或外部样式表触发的排版变化不保证重新测量。
+
+## 相关内容
+
+- [InlineOverflow](./inline-overflow)：判断单行内容是否发生横向溢出。
+- [LineClamp 实验室](../lab/line-clamp)：观察大量实例在宽度、行数和内容变化时的测量表现。
