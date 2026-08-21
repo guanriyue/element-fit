@@ -1,0 +1,255 @@
+---
+description: OverflowList preserves the leading Items that fit on one line and passes trailing Item data to a custom overflow renderer.
+outline: true
+pageType: doc
+---
+
+# OverflowList
+
+`OverflowList` is designed for single-line action lists with a clear priority order. It shows every Item when space is sufficient. When space is limited, it preserves a continuous prefix in DOM order and passes the business data of trailing Items to the consumer through `Overflow`.
+
+The consumer uses `Accessory` to declare elements that occupy layout space while items overflow, such as a more-actions button, menu Trigger, or counter. Dropdowns, menu items, action execution, and visual styles are composed by application components.
+
+## When to use
+
+OverflowList is suitable for toolbars, card action areas, table row actions, and similar layouts:
+
+- Item node order directly expresses preservation priority.
+- Only a continuous set of trailing actions is hidden when space is insufficient.
+- Hidden actions remain available through a menu, Popover, or another custom interface.
+- The real width of the overflow affordance must participate in deciding how many Items remain visible.
+
+Use [FitSwitch](./fit-switch) when the compact state replaces an entire view. If hidden Items must preserve component state, focus, or uncontrolled input values, use a specialized layout that maintains one business node.
+
+## Import
+
+```tsx
+import { OverflowList } from '@guanriyue/react-fit/overflow-list';
+```
+
+## Basic usage
+
+The toolbar below lets you continuously adjust its width, action count, and button labels, and switch between LTR and RTL. When space is insufficient, trailing actions move into the ellipsis menu; they return to the toolbar as space becomes available.
+
+```tsx file="<root>/src/demos/overflow-list/actions.tsx" preview
+
+```
+
+## Composition
+
+```tsx
+<OverflowList className="flex min-w-0 items-center gap-2">
+  {actions.map((action) => (
+    <OverflowList.Item key={action.id} data={action} asChild>
+      <button className="shrink-0" onClick={action.run}>
+        {action.label}
+      </button>
+    </OverflowList.Item>
+  ))}
+
+  <OverflowList.Overflow<Action>>
+    {({ overflowItems }) => (
+      <DropdownMenu>
+        <OverflowList.Accessory asChild>
+          <DropdownMenu.Trigger>More</DropdownMenu.Trigger>
+        </OverflowList.Accessory>
+
+        <DropdownMenu.Content>
+          {overflowItems.map(renderAction)}
+        </DropdownMenu.Content>
+      </DropdownMenu>
+    )}
+  </OverflowList.Overflow>
+</OverflowList>
+```
+
+- `Item` declares an element that may be omitted from the end of the list and carries its business data.
+- `Overflow` exposes the current overflow Item data through a render function and creates no DOM element itself.
+- `Accessory` declares a real element that enters Root's layout while Items overflow.
+
+The HTMLElements ultimately rendered by Item and Accessory must be direct children of Root. Structures such as a Dropdown Root, Context Provider, or Portal that do not add normal-flow DOM inside Root may appear in Overflow's rendered result.
+
+## Item order and state
+
+The final DOM order expresses Item priority. The component always preserves a continuous prefix; it never hides an Item in the middle while continuing to show later Items.
+
+```tsx
+<OverflowList.Item data={primaryAction}>Highest priority</OverflowList.Item>
+<OverflowList.Item data={secondaryAction}>Secondary action</OverflowList.Item>
+<OverflowList.Item data={dangerAction}>Lowest priority</OverflowList.Item>
+```
+
+A hidden Item renders `null`. When the Item becomes visible again, it remounts and the following state is initialized again:
+
+- Component state and effects in the Item subtree.
+- Uncontrolled form state.
+- Current focus and ongoing DOM interactions.
+- Item element refs held by the consumer.
+
+Lift data that must survive hiding outside OverflowList, or store it in business state associated with `Item.data`.
+
+## Overflow data
+
+`Item.data` may contain any business data. Data from hidden Items forms `overflowItems` in DOM order:
+
+```tsx
+<OverflowList.Overflow<Action>>
+  {({ overflowItems }) => (
+    <ActionMenu actions={overflowItems} />
+  )}
+</OverflowList.Overflow>
+```
+
+The render function receives an empty array when nothing overflows. During remeasurement, the component may first commit an all-visible state and candidate overflow result, then commit the final result after accounting for Accessory width. Keep the render function pure.
+
+Overflow may return a Dropdown, Context Provider, Portal, or another composed structure. Any overflow UI that must occupy space in Root's normal flow should register its layout element through Accessory.
+
+Overflow's generic type describes only the data in its render props. At runtime, the component forwards `Item.data` by reference and does not verify that every Item uses the same data shape.
+
+## Accessory
+
+Accessory participates in layout only when at least one Item overflows. It can be a more-actions button, menu Trigger, or counter, and a Root may contain multiple Accessories. All Accessories in the same Root appear and disappear together, and their real combined layout span participates in the calculation.
+
+After candidate overflow is detected, Accessory first mounts in a measuring state. That state uses:
+
+- `visibility: hidden`
+- `pointer-events: none`
+- `aria-hidden="true"`
+- `data-overflow-list-measuring`
+
+These styles place Accessory in the real layout while keeping it invisible and non-interactive. Once measurement completes, the same Accessory element enters its normal visible state. The consumer can determine its content and width without declaring a fixed width in advance.
+
+When Accessory is a Dropdown Trigger, use `asChild` to attach the measurement ref and state to the final Trigger element:
+
+```tsx
+<DropdownMenu>
+  <OverflowList.Accessory asChild>
+    <DropdownMenu.Trigger asChild>
+      <button type="button">More</button>
+    </DropdownMenu.Trigger>
+  </OverflowList.Accessory>
+
+  <DropdownMenu.Content>{/* overflow items */}</DropdownMenu.Content>
+</DropdownMenu>
+```
+
+The Dropdown Root may create no DOM, but the HTMLElement ultimately connected to Accessory must be a direct child of OverflowList Root.
+
+Accessory renders `null` when no Item overflows. Its subtree remounts when the list changes from no overflow to overflow. If Accessory still does not fit after every Item is hidden, the component keeps Accessory visible.
+
+## Layout and styling
+
+Root should form a non-wrapping horizontal layout and use its content box to represent the width available to the list. In flex layouts, Root usually needs `min-width: 0` so it can receive its actual shrunken width from its parent.
+
+Items should generally not shrink, for example by using `flex-shrink: 0`. If Items are allowed to shrink, the browser shrinks them before OverflowList decides which Items to hide.
+
+Prefer Root's `gap` for spacing between Items and Accessories. The component reads each element's span in the real layout, so a fixed gap does not need to be declared in advance. Leading or trailing margins, negative margins, absolute positioning, and transforms can give visual and layout extents different meanings.
+
+Root's normal flow should contain only registered Items and Accessories. Place fixed titles, labels, and actions that are always visible outside OverflowList, and let an outer flex or grid layout allocate the remaining width to OverflowList.
+
+## State and remeasurement
+
+Before the first reliable measurement completes, all Items are visible, Accessory does not render, and Root has no `data-overflow`. The component commits the final visible prefix and overflow data after measurement.
+
+The following changes recalculate the layout result:
+
+- Root's content-box width changes.
+- The border-box width of a currently visible Item changes.
+- The border-box width of a currently visible Accessory changes.
+- An Item or Accessory mounts, unmounts, or changes its final DOM element.
+- An Item's `data` reference changes.
+
+Hidden Items have no DOM and their dimensions can no longer be observed. If only a hidden Item becomes narrower because of an external style change, the component cannot directly know that it now fits. Changing that Item's `data` or key, changing Root's width, or remounting the list re-establishes a complete measurement.
+
+Remeasurement tasks are prioritized according to Root's distance from the viewport. Large groups of offscreen instances may update later. See [Implementation](../implementation/) for the scheduling mechanism.
+
+## API reference
+
+### Root
+
+Contains all OverflowList parts and renders a `div` by default. Root's content box represents the width available to the list.
+
+**Default element:** `div`  
+**Ref:** `HTMLElement`  
+**Supports `asChild`:** Yes
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `asChild` | `boolean` | `false` | Merges Root's props, ref, and overflow state into the only child. |
+
+Root also supports native `div` attributes.
+
+#### Data attributes
+
+| Attribute | Value | Condition |
+| --- | --- | --- |
+| `data-overflow` | `""` | Present when at least one Item overflows. |
+
+### Item
+
+Declares an element that may be hidden from the end of the list and renders a `span` by default.
+
+**Default element:** `span`  
+**Ref:** `HTMLElement`  
+**Supports `asChild`:** Yes
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `data` | `any` | Required | Business data included in `overflowItems` after the Item is hidden. |
+| `asChild` | `boolean` | `false` | Merges Item's props, ref, and registration behavior into the only child. |
+
+Item also supports native `span` attributes. `data` is used only to produce `overflowItems` and is not forwarded as a DOM attribute.
+
+### Overflow
+
+Exposes data for the currently overflowing Items through a render function. Overflow creates no DOM and accepts neither a ref nor native element attributes.
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `children` | `(props: { overflowItems: readonly Data[] }) => ReactNode` | Required | Renders a menu, Accessory, or another business structure from the current overflow data. |
+
+### Accessory
+
+Declares an accessory element that participates in layout while Items overflow and renders a `span` by default.
+
+**Default element:** `span`  
+**Ref:** `HTMLElement`  
+**Supports `asChild`:** Yes
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `asChild` | `boolean` | `false` | Merges Accessory's props, ref, and measurement state into the only child. |
+
+Accessory also supports native `span` attributes. During measurement, it sets `aria-hidden` to `true` and overrides inline `visibility` and `pointerEvents` with `hidden` and `none`. While normally visible, it uses the values supplied by the consumer.
+
+#### Data attributes
+
+| Attribute | Value | Condition |
+| --- | --- | --- |
+| `data-overflow-list-measuring` | `""` | Present while Accessory participates in layout invisibly for measurement. |
+
+## Boundaries
+
+- OverflowList supports single-line horizontal lists. Its visible result is always a continuous prefix in DOM order.
+- The HTMLElements ultimately rendered by Item and Accessory must be direct children of Root.
+- Items should not shrink, unless the consumer accepts a layout in which Items shrink before they overflow.
+- Multiple Accessories appear and disappear together; they cannot be omitted independently according to remaining space.
+- DOM order expresses Item priority. CSS `order` and `row-reverse` do not change the hiding order.
+- LTR and RTL use the same DOM-order priority.
+- Separator visibility depends on adjacent Item state and is not managed separately by the current layout model.
+- Leading or trailing margins, negative margins, absolute positioning, transforms, and out-of-flow content are outside the stable measurement model.
+- Hidden Items and absent Accessories are unmounted, so their subtree state and focus are not preserved.
+
+## Related
+
+- [FitSwitch](./fit-switch): switches between Expanded and Collapsed according to the width of a complete view.
+- [OverflowList Lab](../lab/overflow-list): observes many instances while width and content change continuously.
+- [OverflowList DOM Scheduling Experiment](../lab/overflow-list-dom): compares preserving all Item DOM with React conditional mounting.

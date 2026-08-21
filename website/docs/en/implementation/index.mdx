@@ -1,0 +1,26 @@
+---
+description: Measurement models, scheduling mechanisms, and component algorithms in Element Fit.
+outline: true
+pageType: doc
+---
+
+# Implementation
+
+This section records Element Fit's design choices for browser measurement, state invalidation, task scheduling, and layout algorithms. It explains why components behave as described in the guides; it is not a public API reference.
+
+For component props, data attributes, styling responsibilities, and usage boundaries, see the [Component Guides](../guide/). To observe large numbers of instances or compare experimental implementations, visit the [Lab](../lab/).
+
+## Scope
+
+Technical content is organized around these topics:
+
+- **Measurement and invalidation**: ResizeObserver, MutationObserver, content boxes, border boxes, geometry caches, and the changes that invalidate cached results.
+- **Layout task scheduling**: DOM read/write stages, viewport priority, synchronous React commits, and sources of forced reflow.
+- **Component algorithms**: decision procedures and precision handling specific to components such as InlineOverflow, LineClamp, and OverflowList.
+- **Platform boundaries**: browser API precision, unobservable computed-style changes, and the performance tradeoffs of each implementation choice.
+
+Content belongs in this section only when it explains an internal algorithm or browser behavior. Constraints that users must know to use a component correctly remain in the corresponding Guide page.
+
+## Component algorithms
+
+- [Range and Browser Geometry Measurement](./range-geometry): uses Range to read subpixel widths and layout fragments, addressing precision gaps in browser sizing APIs.

@@ -1,0 +1,161 @@
+---
+description: Reproduce an alternative layout state with invisible but layout-participating DOM, then measure geometry the current DOM cannot answer directly.
+outline: true
+pageType: doc
+---
+
+# DOM Mirror Measurement
+
+Browser geometry APIs can read only layouts that have already been formed. They answer how much space the current node occupies, but cannot directly answer counterfactual questions: what layout would result at another width, without a decoration node, or without a height constraint?
+
+DOM mirror measurement creates a temporary node, copies the content and styles that affect the target layout, lets the browser perform that alternative layout, and then reads its geometry. It does not reimplement CSS layout in JavaScript; it constructs a measurable hypothetical state for the browser.
+
+## A mirror must participate in layout
+
+A node with `display: none` generates no target layout box. Its `scrollHeight`, Range rectangles, and element geometry cannot describe how it would lay out when displayed. A mirror must remain layoutable without appearing visually or participating in normal document flow.
+
+A common base style is:
+
+```css
+.measure-container {
+  position: fixed;
+  inset: 0 auto auto 0;
+  width: 0;
+  height: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+```
+
+CSS defines `visibility: hidden` as invisible content whose boxes still affect layout, making it suitable for measurement. `position: fixed` or `absolute` removes the container from normal flow, and a zero-size shell reduces its influence on page scroll extent and surrounding layout.
+
+Descendants can reset `visibility` to `visible`. When measuring arbitrary DOM subtrees, add `opacity: 0` at the mirror root or enforce a non-overridable hidden style on each measurement node so descendant rules cannot reveal content accidentally.
+
+Do not use the native `hidden` attribute as a measurement state, because user-agent styles normally map it to `display: none`. Visual hiding, removal from normal flow, and preservation of layout boxes are separate requirements and must be handled separately.
+
+## Use the same document for the layout environment
+
+Create a mirror from the source node's `ownerDocument` and connect it to that same Document. It then uses the same font resources, device-pixel environment, writing system, and browser layout implementation. This also avoids attaching a node from an iframe or multi-Document page to the global `document` incorrectly.
+
+Connection position affects selectors, inheritance, and containing blocks. A standalone measurement container under `body` is usually stable and controllable, but loses context supplied by the source node's ancestor chain. Mounting a mirror near the source preserves more ancestor conditions, but can make it participate in local flex, grid, container-query, or overflow layout.
+
+No mount location is transparent to every kind of CSS. A mirror must explicitly choose the layout inputs it reproduces and isolate environmental effects that are not part of the measurement target.
+
+## Copy size-affecting computed styles
+
+Copying only `className` does not guarantee equivalent styles. Selectors may depend on ancestor structure, attributes, pseudo-classes, CSS Module scope, or container queries. A more stable method reads the source node's computed style and writes size-affecting properties into the mirror.
+
+Typical size properties include:
+
+- Font family, size, weight, line height, letter spacing, and font features.
+- `white-space`, wrapping, word breaking, hyphenation, and tab size.
+- Width, box sizing, padding, and borders.
+- Writing mode, direction, text orientation, and unicode bidi.
+- Scrollbar gutter and overflow behavior that alter scroll dimensions.
+
+Choose the copied set according to the measurement question. Copying every CSS property increases read and write cost and may import irrelevant or harmful visual state such as colors, animations, transforms, and positioning. Copying too little lets mirror layout diverge from the source.
+
+`getComputedStyle()` returns browser-resolved values, but not a complete layout snapshot. Percentages, containing blocks, pseudo-elements, and some tree-dependent behavior can still produce different results at the new location. Copying computed styles narrows environmental differences; it does not serialize a DOM subtree completely.
+
+## Content and state are different kinds of copies
+
+For plain text, write the current string into an equivalent element. For mixed DOM content, `cloneNode(true)` can copy the structure. Both approaches must distinguish markup from runtime state:
+
+- A DOM clone does not copy listeners registered with `addEventListener()`.
+- A form control's current editing state may differ from the initial state in its attributes.
+- A canvas bitmap is not part of ordinary child-node structure.
+- Selection, focus, scroll position, and custom-element internal state have no general-purpose copy.
+- Pseudo-elements such as `::before` and `::after` are not clonable DOM children.
+
+A mirror needs to reproduce only the state that affects target geometry; it need not become an interactive copy. For native form controls, explicitly synchronizing current value, placeholder, wrap, and other measurement inputs is often clearer than cloning the entire node state.
+
+## Override the measurement state
+
+After copying size styles, the mirror must override properties that conflict with the measurement target. For example, when measuring natural content height, the source node's current fixed height, minimum height, maximum height, or resize state must not continue to constrain the mirror:
+
+```css
+.mirror {
+  display: block !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: hidden !important;
+  position: absolute !important;
+  visibility: hidden !important;
+}
+```
+
+These overrides are not a universal mirror template. For natural-width measurement, forcing `width` would destroy the result. For wrapping at a specified container width, the mirror must receive the exact available width. Each mirror first defines its invariants and unknowns, then decides which source styles to preserve and which state constraints to remove.
+
+## Stage mounting and reading
+
+Mirror measurement inherently contains a write-to-read dependency:
+
+```text
+read: read source content, dimensions, and computed style
+write: configure and mount the mirror
+read: read the mirror's scroll size, rect, or Range fragments
+write: commit the result and clean up the mirror
+```
+
+The browser can produce a real result only after the mirror is connected to a layout-capable Document. A geometry read after mounting generally requires layout resolution, so avoid completing every instance from start to finish before moving to the next.
+
+Multiple mirrors can prepare in their respective read stages, merge new nodes into a `DocumentFragment`, and write once to the measurement container. Their geometry can then be read together. This aligns the layout dependencies of many instances at the same stage boundary; see [Staged Layout Task Batching](./layout-task-scheduling) for the scheduling model.
+
+## Isolate the measurement container
+
+A shared measurement container reduces repeated top-level node creation. It commonly receives containment and states that make it non-interactive and inaccessible:
+
+```css
+.measure-container {
+  contain: strict;
+  pointer-events: none;
+  visibility: hidden;
+}
+```
+
+`contain: strict` can limit the effect of mirror layout on the rest of the page, but containment also changes percentage sizes, intrinsic sizing, and containing-block semantics. Use this isolation only after mirrors have received the dimensions required by their measurement model.
+
+Measurement nodes should also be excluded from interaction and the accessibility tree through an appropriate combination of `aria-hidden="true"`, `inert`, a negative tab index, or a read-only state. The exact combination depends on the node type. Visual invisibility alone does not guarantee that a node cannot receive focus or be exposed to assistive technology.
+
+## Reuse mirrors briefly
+
+Continuous input, resize animation, or a batched update may repeatedly measure the same source node over a short period. Destroying each mirror immediately repeats DOM creation, style writing, mounting, and removal.
+
+A mirror pool can retain a node briefly after measurement:
+
+1. Reclaim it when the same source is measured again.
+2. Rewrite its content and sizing styles on every configuration; do not treat old measurement state as a reliable cache.
+3. After the retention period, remove mirrors that have not been reclaimed in a later frame.
+4. Associate cleanup records with node identity so an old cleanup task cannot remove a mirror that has already been reused.
+
+The reusable resource is the DOM node, not its geometry result. Content, width, or style changes still require new layout and reading. Retention duration is also not part of measurement semantics; it is a performance tradeoff between node creation cost and the number of resident DOM nodes.
+
+## Cleanup closes the transaction
+
+A mirror may fail during preparation, mounting, or reading, and a task may be canceled in the middle. Cleanup cannot exist only after normal result submission; it must be the final step of the measurement transaction:
+
+- A mounted temporary node must be removed or returned to the pool.
+- A node that never connected successfully must still leave pending collections.
+- Other mirrors should continue measuring if one instance fails.
+- A cleanup error must not prevent remaining resources from being released.
+
+Reliable cleanup lets a measurement task span multiple DOM stages without turning an intermediate mirror into permanent page state.
+
+## Choosing in-place or mirror measurement
+
+In-place measurement reads the current DOM directly. It creates no temporary node, copies no styles, generally costs less, and preserves the complete ancestor environment and runtime state. It can answer only questions already expressed by the current layout.
+
+Mirror measurement adds DOM, style copying, and another layout, but can isolate the visible state or construct layout conditions absent from the current DOM. The choice depends on whether the problem is counterfactual layout, not on whether a particular geometry API is precise enough.
+
+## Boundaries
+
+- A mirror must genuinely participate in layout and cannot be hidden with `display: none`.
+- Mount location, ancestor selectors, inheritance, and container queries can make the mirror differ from the source environment.
+- Copying computed styles cannot completely reproduce pseudo-elements, tree-dependent behavior, or every intrinsic-sizing condition.
+- A DOM clone is not a runtime-state copy; complex forms, canvas, and custom elements require special handling.
+- Containment, fixed positioning, and forced dimensions alter layout and are valid only when they match the measurement model.
+- Reading mirror geometry can still trigger synchronous layout and should be staged separately from DOM writes.
+- Mirror reuse reduces resource creation but cannot reuse stale geometry results.
+
+The core of DOM mirror measurement is asking the browser to calculate a controlled hypothetical layout. The mirror must be close enough to the target typography while remaining isolated from the page's visuals, interaction, and normal document flow.

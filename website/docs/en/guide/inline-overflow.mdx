@@ -1,0 +1,224 @@
+---
+description: InlineOverflow observes whether single-line content overflows horizontally.
+outline: true
+pageType: doc
+---
+
+# InlineOverflow
+
+`InlineOverflow` measures whether single-line content overflows horizontally and composes accessory UI from the derived `overflow` state. It does not provide a Tooltip, Popover, expand button, layout, or clipping styles.
+
+It is suitable for width-constrained single-line content such as table cells, names, paths, and labels. It is not designed for multiline truncation, vertical writing modes, or complex transforms.
+
+## Capability boundaries
+
+`InlineOverflow` measures only the real DOM layout currently formed by Root and Content. It does not construct a hidden copy or simulate a layout that has not been rendered.
+
+Counterfactual measurement means measuring a hypothetical state that does not exist in the current DOM. For example, Accessory has not been rendered, but the consumer wants to know in advance whether Content would overflow if Accessory appeared and occupied some width. That requires temporarily constructing or simulating another layout and is outside the scope of `InlineOverflow`. The component first measures the existing layout, then decides whether to render Accessory.
+
+## Import
+
+```tsx
+import { InlineOverflow } from '@guanriyue/react-fit/inline-overflow';
+```
+
+## Basic usage
+
+Root and Content provide no default styles. The consumer must give Root a measurable box, determine how Content receives and shrinks within the available width, and explicitly choose single-line layout and clipping behavior.
+
+### Consumer-defined display strategy
+
+The example below lets you adjust the container width, Root padding, text, and ellipsis or clip strategy. `InlineOverflow` only reports horizontal overflow; it does not override Content's `white-space`, `overflow`, or `text-overflow`.
+
+```tsx file="<root>/src/demos/inline-overflow/style-strategies.tsx" preview
+
+```
+
+`onOverflowChange` is called after the first reliable measurement. It is subsequently called only when the boolean state changes, or when the Root or Content element is replaced and a new first measurement completes. Root has a `data-overflow` attribute while content overflows; Content and Accessory do not repeat that state.
+
+## Measurement precision
+
+InlineOverflow first compares `scrollWidth` with the available width. The `scrollWidth` and `clientWidth` values exposed to JavaScript are integers, while text layout can still land on subpixel boundaries. When the values are equal or differ only slightly, this initial result does not have enough confidence.
+
+When the difference enters a conservative `1 CSS px` boundary, the component uses `Range.getBoundingClientRect()` to read fractional content geometry and make a second-level decision. Integer dimensions always provide the first-level decision; Range only corrects boundary results that integers cannot distinguish.
+
+The Range API is one way the component works around browser sizing bugs. It reads the geometric bounding box of rendered content, not the browser's ellipsis state. This mechanism supports ordinary single-line text and some mixed inline content. Margins, pseudo-elements, positioning, transforms, and multiline layout are outside its stable measurement range. See [Range and Browser Geometry Measurement](../implementation/range-geometry) for the complete decision process, related community issues, and box-model handling.
+
+### Correcting the ellipsis boundary
+
+The two groups below have identical content, layout, and width. They compare the result with Range boundary correction enabled against a result based only on integer dimensions.
+
+As shown, Range boundary correction can identify an ellipsis state missed by integer dimension checks.
+
+![Ellipsis detection with and without boundary correction](/inline-overflow-range-diff.png)
+
+The interactive demo below provides a slider for quick adjustment and a numeric input for entering an exact width or moving one pixel at a time with the arrow keys. You can also change the text length. When the boundary is reached, the example displays `clientWidth`, `scrollWidth`, and the Range width together:
+
+```tsx file="<root>/src/demos/inline-overflow/wide.tsx" preview
+
+```
+
+### Multiple inline nodes
+
+The example below contains `inline-block` and `inline-flex` nodes. Both groups preserve the same content, layout, and width so that mixed nodes can be observed as they enter the Range correction boundary.
+
+As shown, mixed inline nodes can also participate in Range boundary correction.
+
+![Multiple inline nodes with and without boundary correction](/inline-overflow-inline-nodes-diff.png)
+
+In the interactive demo, you can adjust the width and edit the text inside the final `inline-flex` node. The remaining inline structure stays unchanged, making the mixed-node case easier to observe repeatedly:
+
+```tsx file="<root>/src/demos/inline-overflow/inline-nodes.tsx" preview
+
+```
+
+Content may contain multiple inline, inline-block, or inline-flex nodes. The component measures only the Content element itself, so each Root should still contain exactly one Content.
+
+## Show complete content on hover
+
+```tsx file="<root>/src/demos/inline-overflow/hover.tsx" preview
+
+```
+
+Tooltip behavior is not built in. The example uses `onOverflowChange` to control whether the Tooltip can open and keeps it closed when the content does not overflow.
+
+## Accessory
+
+Accessory is shown or hidden only according to the `overflow` state and does not participate in overflow detection. When content does not overflow, Accessory renders no DOM node. It mounts and enters the consumer-defined layout only after overflow occurs.
+
+A Root may contain multiple Accessories. Each Accessory must be within the corresponding Root's React context, but its DOM position does not need to be adjacent to or on the same row as Content.
+
+### Same row
+
+```tsx file="<root>/src/demos/inline-overflow/accessory.tsx" preview
+
+```
+
+### Preserve the end of a filename
+
+In a file list, Content can always render the complete filename and use ordinary ellipsis to show its beginning, while Accessory duplicates the trailing portion that the application wants to preserve when overflow occurs. The measurement still asks whether the complete filename fits inside Root, not how much width remains after Accessory mounts. The trailing content therefore cannot cause the state to oscillate by occupying additional space.
+
+The application should choose the preserved range, such as the last semantic segment and extension. Because the text in Accessory duplicates part of the complete filename, the example uses `aria-hidden` and `user-select: none` to prevent assistive technology and text selection from receiving the suffix twice.
+
+```tsx file="<root>/src/demos/inline-overflow/filename-suffix.tsx" preview
+
+```
+
+### Separate row
+
+```tsx file="<root>/src/demos/inline-overflow/accessory-separate-row.tsx" preview
+
+```
+
+## asChild
+
+Root, Content, and Accessory all support `asChild`. The component attaches refs, state attributes, and behavior to the only child without adding display styles. Content remains the only measurement node.
+
+```tsx file="<root>/src/demos/inline-overflow/as-child.tsx" preview
+
+```
+
+## Single-element mode
+
+When Root and Content do not need separate DOM elements, Root can use `asChild` with Content as its only child. Root's ref and `data-overflow` state are merged with Content's measurement ref on the same element.
+
+Single-element mode supports inline padding directly on the shared element. The component compares the same element's `scrollWidth` and `clientWidth` padding boxes, then continues with content-box and Range correction near the boundary so that the element's own padding is not mistaken for overflowing content.
+
+```tsx file="<root>/src/demos/inline-overflow/single-element.tsx" preview
+
+```
+
+This form is useful for compact structures that only need overflow state or `data-overflow`. When composing Accessory, prefer separate Root and Content elements so that Accessory does not enter Content's measured subtree.
+
+## Layout requirements
+
+- Root, Content, and Accessory provide no default styles.
+- The consumer must constrain Root's width and choose Content's single-line layout and clipping strategy.
+- Text content needs `white-space: nowrap` or an equivalent single-line layout. If wrapping is allowed, the result no longer represents whether one line fits.
+- The consumer may choose `overflow: hidden`, `overflow: clip`, `text-overflow: ellipsis`, a gradient mask, or state observation without clipping.
+- Flex layouts usually require `min-width: 0` on Content.
+- Grid layouts usually require `minmax(0, 1fr)` or `min-width: 0` on Content.
+- Root padding participates in measurement. The component compares Content's `scrollWidth` with Root's content-box width after subtracting inline padding.
+- When Root and Content are separate, avoid padding, margins, and other styles on Content that alter the layout calculation. Such styles make the relationship between content width and target available width unstable. Padding is supported on the shared element in single-element mode.
+
+## Observation boundaries
+
+The component uses ResizeObserver to observe Root and Content dimensions, and MutationObserver to observe text and child-node changes in the Content subtree. Replacing Root or Content, or changing text or child nodes within Content, establishes a new measurement result.
+
+MutationObserver does not observe attributes. If only a class, style, inherited style, font, or pseudo-element content changes while neither Root's available width nor the Content subtree produces an observable change, the component does not guarantee a new measurement. When text layout changes through a theme class, responsive class, or external stylesheet, verify in the target interaction that the overflow state is re-established.
+
+Before the first reliable measurement completes, the internal overflow state is `false`, `data-overflow` is absent, and Accessory does not render. The component currently provides no `defaultOverflow`, controlled `overflow`, or manual remeasure API.
+
+## API reference
+
+### Root
+
+Contains all InlineOverflow parts and renders a `span` by default. Root's content box represents the target width available to Content.
+
+**Default element:** `span`  
+**Ref:** `HTMLElement`  
+**Supports `asChild`:** Yes
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `onOverflowChange` | `(overflow: boolean) => void` | — | Called after the first reliable measurement, then when overflow changes or when Root or Content is replaced and completes a new measurement. |
+| `asChild` | `boolean` | `false` | Merges Root's props, ref, and overflow state into the only child. |
+
+Root also supports native `span` attributes.
+
+#### Data attributes
+
+| Attribute | Value | Condition |
+| --- | --- | --- |
+| `data-overflow` | `""` | Present when Content overflows horizontally. |
+
+### Content
+
+Declares the only overflow measurement node and renders a `span` by default. The consumer provides Content's single-line layout and clipping styles.
+
+**Default element:** `span`  
+**Ref:** `HTMLElement`  
+**Supports `asChild`:** Yes
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `asChild` | `boolean` | `false` | Merges Content's props, ref, and measurement behavior into the only child. |
+
+Content also supports native `span` attributes.
+
+### Accessory
+
+Declares an accessory node rendered only while Content overflows and renders a `span` by default. Accessory does not participate in overflow detection.
+
+**Default element:** `span`  
+**Ref:** `HTMLElement`  
+**Supports `asChild`:** Yes
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `asChild` | `boolean` | `false` | Merges Accessory's props and ref into the only child. |
+
+Accessory also supports native `span` attributes. It renders `null` while content does not overflow, so the corresponding subtree state and ref are not preserved.
+
+## Boundaries
+
+- InlineOverflow detects horizontal overflow in single-line content. It does not support multiline truncation or vertical writing modes.
+- Each Root should contain exactly one Content. Content is the only content measurement node.
+- Root's content box must represent Content's target available width.
+- When Root and Content are separate, Content should not have padding or margins that change the measurement semantics.
+- Accessory must be within the corresponding Root's React context, but it does not need to be adjacent to or on the same row as Content.
+- Accessory does not participate in overflow detection. The space it occupies after rendering does not change the measurement baseline.
+- Range boundary correction measures only DOM content that already participates in layout; it does not provide the intrinsic width of an arbitrary DOM subtree.
+- Complex transforms, positioning, pseudo-elements, and visual changes that are not reflected in observable browser dimensions are outside the stable measurement model.
+
+## Related
+
+- [Range and Browser Geometry Measurement](../implementation/range-geometry): integer dimensions, Range boundary correction, and layout fragments.
+- [InlineOverflow Lab](../lab/inline-overflow): observes measurement results around boundary widths and with many instances.
+- [LineClamp](./line-clamp): detects whether multiline content exceeds a specified number of lines.

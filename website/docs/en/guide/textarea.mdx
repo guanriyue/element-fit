@@ -1,0 +1,195 @@
+---
+description: Textarea preserves native textarea input semantics and automatically adjusts height according to content and available width.
+outline: true
+pageType: doc
+---
+
+# Textarea
+
+`Textarea` adds optional automatic height to a native `<textarea>`. Without `autoSize`, it preserves native sizing behavior. When enabled, it calculates height from the current content, typography, and available width.
+
+The component controls only the measured inline `height`. Input state, validation, scrolling, clipping, and resize behavior remain under native attributes, form state, and consumer styles.
+
+## When to use
+
+Textarea is suitable for comment boxes, notes, form descriptions, and other multiline inputs that grow with their content:
+
+- Adjust height as input content grows or shrinks.
+- Recalculate height when the container width changes and text wraps differently.
+- Constrain growth with minimum and maximum line counts.
+- Preserve native controlled, uncontrolled, and form behavior.
+
+Leave `autoSize` disabled when users should resize freely and retain a fixed height. Automatic height does not allocate space according to parent height and does not replace virtual scrolling or complex content layout in an editor.
+
+## Import
+
+```tsx
+import { Textarea } from '@guanriyue/react-fit/textarea';
+```
+
+## Basic usage
+
+The example below switches among disabled, unlimited, and line-constrained modes, and lets you adjust `rows`, `minRows`, `maxRows`, and `overflow-y`.
+
+```tsx file="<root>/src/demos/textarea/basic.tsx" preview
+
+```
+
+## Automatic height
+
+Pass `autoSize` or `autoSize={{}}` to enable automatic height. Without a line limit, Textarea continues to grow with its content:
+
+```tsx
+<Textarea autoSize />
+```
+
+Use `minRows` and `maxRows` to constrain the growth range:
+
+```tsx
+<Textarea
+  autoSize={{ minRows: 2, maxRows: 6 }}
+  style={{ overflowY: 'auto', resize: 'none' }}
+/>
+```
+
+Content shorter than the minimum retains the minimum height. Once content exceeds the maximum, the submitted height stops growing. Textarea does not change `overflow-y` automatically for `maxRows`; choose `auto` or `scroll` when overflowed content must remain accessible.
+
+When `autoSize` is omitted or `false`, the component does not write a measured height:
+
+```tsx
+<Textarea rows={4} style={{ height: 160 }} />
+```
+
+In this mode, `rows`, CSS height, and browser resize behavior retain native semantics.
+
+## Row constraints
+
+In automatic height mode, `rows` can also provide the minimum line count:
+
+- Without `autoSize`, `rows` retains native textarea semantics.
+- With `autoSize` and no valid `minRows`, a positive integer `rows` becomes the minimum line count.
+- When both `minRows` and `rows` are valid, `minRows` takes precedence.
+- `minRows` and `maxRows` accept only positive integers.
+- If `maxRows` is smaller than the effective minimum, it is treated as the minimum.
+
+`minRows` and `maxRows` can be used independently:
+
+```tsx
+<Textarea autoSize={{ minRows: 3 }} />
+<Textarea autoSize={{ maxRows: 8 }} />
+```
+
+Invalid `minRows` or `maxRows` values are ignored and produce a warning in development.
+
+## Controlled and uncontrolled input
+
+Textarea preserves native `value`, `defaultValue`, and `onChange` APIs.
+
+In controlled mode, it remeasures after React commits the new `value`:
+
+```tsx
+const [value, setValue] = useState('');
+
+<Textarea
+  autoSize={{ minRows: 2, maxRows: 8 }}
+  value={value}
+  onChange={(event) => {
+    setValue(event.target.value);
+  }}
+/>
+```
+
+In uncontrolled mode, user input directly schedules a new measurement:
+
+```tsx
+<Textarea autoSize defaultValue="Initial content" />
+```
+
+Changing the native element's `value` property directly through a ref does not produce a React change event and does not schedule measurement. Prefer a controlled `value` for programmatic updates.
+
+## Styling and scrolling
+
+After automatic measurement, the component writes the measured `height` after the consumer's `style`, so automatic height overrides `style.height`. Disabling `autoSize` restores the supplied height.
+
+The component does not control these styles:
+
+- `overflow-y`
+- `resize`
+- `min-height` and `max-height`
+- Fonts, line height, letter spacing, and wrapping rules
+- Padding, borders, and `box-sizing`
+
+CSS `min-height` and `max-height` can still constrain the final used height. Whether a scrollbar appears after reaching `maxRows` depends on the consumer's `overflow-y`.
+
+In automatic height mode, the next measurement overwrites a height obtained from the vertical resize handle. A stable automatic-height interface should generally use `resize: none` or allow only horizontal resizing.
+
+## Measurement model
+
+The component reproduces the original element's layout with a hidden mirror textarea. Measurement reads the original Textarea's content, border-box width, and relevant computed styles, then obtains its natural height from the mirror's `scrollHeight`.
+
+Measured styles include fonts, line height, letter spacing, text direction, wrapping rules, padding, borders, and `box-sizing`. The result therefore comes from the browser's real textarea layout rather than an estimate based on character count or a fixed line height.
+
+When the value is empty, placeholder text participates in height measurement. When both value and placeholder are empty, the component still preserves one input line. Blank lines produced by a trailing newline are also included in content height.
+
+When `minRows` or `maxRows` is present, another single-line mirror reads the height of one line under the current styles, and the natural height is clamped to the corresponding range.
+
+Measurements for multiple Textareas are merged into shared staged layout tasks: first read original nodes, then mount or update mirrors together, then read heights and commit results. When the same Textarea requests measurement repeatedly, unfinished older results become stale.
+
+## Observation and remeasurement
+
+With automatic height enabled, these changes schedule measurement:
+
+- Controlled `value` or `defaultValue` props change.
+- An uncontrolled Textarea receives user input.
+- `autoSize`, `minRows`, `maxRows`, or the effective minimum line count changes.
+- Textarea's content-box width changes.
+- The `class`, `cols`, `dir`, `id`, `lang`, `placeholder`, `rows`, or `wrap` attribute changes.
+- The contents of the React `style` prop change.
+
+The component observes the ResizeObserver border box and uses content-box width to decide whether text needs a new layout. A height-only change does not trigger another mirror measurement when available width remains unchanged.
+
+If an external stylesheet, ancestor class, inherited style, or font changes while neither the Textarea's observed attributes nor its content-box width changes, the component does not guarantee remeasurement.
+
+A Textarea with width `0` cannot establish a valid text layout measurement, so the component preserves its current height. It tries again after the element regains a nonzero width and produces a size observation.
+
+Before the first reliable measurement completes, Textarea uses native `rows` and consumer styles for its initial height. With many instances, measurement tasks far from the viewport may complete later.
+
+## API reference
+
+### Textarea
+
+Renders a native multiline input and, when enabled, submits an automatically measured height.
+
+**Default element:** `textarea`  
+**Ref:** `HTMLTextAreaElement`  
+**Supports `asChild`:** No
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `autoSize` | `boolean \| { minRows?: number; maxRows?: number }` | `undefined` | Enables automatic height with optional minimum and maximum line counts. |
+
+In addition to `autoSize`, Textarea supports native `textarea` attributes and events. Automatic height overrides inline `height`; other properties continue to the native element.
+
+### TextareaAutoSizeOptions
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `minRows` | `number` | `undefined` | Minimum line count for automatic height; accepts positive integers and takes precedence over native `rows`. |
+| `maxRows` | `number` | `undefined` | Maximum line count for automatic height; accepts positive integers and is treated as the minimum when smaller than the effective minimum. |
+
+## Boundaries
+
+- Automatic height only calculates and writes `height`; it does not manage `overflow-y`, `resize`, or scroll position.
+- `minRows` and `maxRows` accept only positive integers.
+- In automatic height mode, `style.height` is overridden after the first reliable measurement.
+- CSS `min-height` and `max-height` still participate in the final cascade and size constraints.
+- ResizeObserver remeasurement occurs only when Textarea's available width changes; a height-only change does not create a measurement loop.
+- Changing `value` directly through a ref does not schedule measurement.
+- External style and font changes that do not alter Textarea attributes or width do not guarantee remeasurement.
+- Elements with width `0` wait for a later measurable size.
+
+## Related
+
+- [Textarea Lab](../lab/textarea): compares many automatic-height instances with a CSS `field-sizing: content` baseline.

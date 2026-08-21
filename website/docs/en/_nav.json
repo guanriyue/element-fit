@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "text": "Components",
+    "link": "/guide/"
+  },
+  {
+    "text": "Implementation",
+    "link": "/implementation/"
+  },
+  {
+    "text": "Lab",
+    "link": "/lab/"
+  }
+]

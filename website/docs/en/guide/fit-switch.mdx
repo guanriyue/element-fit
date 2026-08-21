@@ -1,0 +1,185 @@
+---
+description: FitSwitch switches between Expanded and Collapsed views according to the width required by the expanded view.
+outline: true
+pageType: doc
+---
+
+# FitSwitch
+
+`FitSwitch` declares two complete views: the preferred `Expanded` view and the `Collapsed` view used when space is insufficient. It compares the width required by Expanded with the available width of the parent shared by both Views, then selects the representation that fits.
+
+Collapsed and Expanded remain mounted at all times. FitSwitch expresses the current mode through state attributes and `inert` on each View. The consumer defines how the Views are positioned, hidden, clipped, and transitioned.
+
+## When to use
+
+FitSwitch is suitable for toolbars, tabs, pagination controls, action areas, and other interfaces with two complete representations. For example:
+
+- Expanded shows an icon and label, while Collapsed shows only the icon.
+- Expanded shows a row of action buttons, while Collapsed shows a menu entry point.
+- Both views need to remain mounted for bidirectional transition animations.
+- Business state can be lifted to a common parent and shared by both views.
+
+FitSwitch switches an entire View at once. Use [OverflowList](./overflow-list) when the leading Items should remain visible and only trailing actions should move into a menu. When the same business node must always be used and only its internal content changes, use a component or business layout designed for that state model.
+
+## Import
+
+```tsx
+import { FitSwitch } from '@guanriyue/react-fit/fit-switch';
+```
+
+## Basic usage
+
+FitSwitch does not create a DOM element. The HTMLElements rendered by Collapsed and Expanded must be direct children of the same parent. The content box of that parent represents all available width.
+
+```tsx
+<div className="relative min-w-0 overflow-hidden">
+  <FitSwitch>
+    <FitSwitch.Collapsed className={viewClassName}>
+      <CompactActions />
+    </FitSwitch.Collapsed>
+
+    <FitSwitch.Expanded className={viewClassName}>
+      <FullActions />
+    </FitSwitch.Expanded>
+  </FitSwitch>
+</div>
+```
+
+In the tabs example below, Expanded shows icons and labels while Collapsed shows only icons. Adjust the container width, number of tabs, label length, Expanded padding, `asChild`, and transition styles to observe the switching threshold.
+
+```tsx file="<root>/src/demos/fit-switch/tabs.tsx" preview
+
+```
+
+## View state
+
+The active View preserves the `inert` value supplied by the consumer. The other View receives an empty `data-fit-inactive` attribute and is forced to be `inert`, preventing keyboard focus and user interaction from entering the inactive subtree.
+
+Use `data-fit-inactive` to remove the inactive View from normal flow and hide it visually while preserving a measurable border box:
+
+```tsx
+const viewClassName =
+  'w-max data-fit-inactive:absolute data-fit-inactive:opacity-0';
+```
+
+The shared parent usually needs `position: relative` and, depending on the transition, `overflow: hidden`. The inactive View must remain observable and must not use `display: none`.
+
+Expanded should use `inline-flex`, `inline-block`, `width: max-content`, or an equivalent style so that its border box represents the width required by the complete content. Default block stretching, `width: 100%`, or another width constrained by the parent can make the measured width equal only the allocated space rather than the content's actual requirement.
+
+## Content changes and transition animations
+
+When the visible Expanded view grows because of a content or style change and consequently switches to Collapsed, Expanded temporarily receives `data-fit-invalidated`. This state remains for at least one paint frame and indicates that Expanded is no longer the valid complete view from the previous frame.
+
+This attribute can disable the Expanded transition only for that switch while preserving the Collapsed entrance animation:
+
+```tsx
+const viewClassName =
+  'transition data-fit-inactive:absolute data-fit-inactive:opacity-0 data-fit-invalidated:transition-none';
+```
+
+Normal bidirectional switching caused by a container resize does not set `data-fit-invalidated`. The attribute is also not set when switching from Collapsed back to Expanded.
+
+The toolbar below uses clipping on the parent and transforms on the Views. Expanded moves to the right while inactive, and Collapsed rotates as the menu button appears. A transform changes only the visual result; it does not change the border-box width reported by ResizeObserver.
+
+```tsx file="<root>/src/demos/fit-switch/actions-animation.tsx" preview
+
+```
+
+## Layout and measurement
+
+FitSwitch bases its decision on two sizes:
+
+- The content-box inline size of the parent shared by Collapsed and Expanded.
+- The border-box inline size of Expanded.
+
+Margins, transforms, outlines, and box shadows on a View are outside its border box and are not included in the required width. Other in-flow content in the shared parent, allocation outside its padding, and gaps are not subtracted separately from the available width. The shared parent should therefore represent the entire horizontal space available to either View.
+
+When content, fonts, padding, borders, or another factor changes Expanded's border box, the component immediately re-evaluates the current mode. When the shared parent changes size, measurement tasks are prioritized by each element's distance from the viewport; instances far from the viewport may switch later. See [Implementation](../implementation/) for details about scheduling.
+
+## State and lifecycle
+
+Collapsed is active until the first reliable measurement completes, and Expanded has `data-fit-inactive`. Once the component has both the parent size and the Expanded size, it decides whether to switch to Expanded.
+
+The two Views are independent React subtrees:
+
+- Components on both sides mount and run their own effects.
+- Switching Views does not unmount either subtree, so each subtree preserves its internal state.
+- The same business state is not synchronized automatically between the two subtrees and should usually be lifted into controlled state.
+- A single business object has two nodes in the DOM, so IDs, form fields, and DOM relationships must not conflict.
+
+The inactive View's `inert` state prevents interaction and focus, but it does not change the model in which both subtrees exist simultaneously.
+
+## API reference
+
+### Root
+
+Provides the shared store for Collapsed and Expanded. Root renders only a Context Provider; it does not create a DOM element and does not accept a ref or `asChild`.
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `children` | `ReactNode` | `undefined` | Declares one Collapsed and one Expanded View. |
+
+### Collapsed
+
+Declares the complete view shown when Expanded does not fit in the shared parent. It renders a `div` by default.
+
+**Default element:** `div`  
+**Ref:** `HTMLElement`  
+**Supports `asChild`:** Yes
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `asChild` | `boolean` | `false` | Merges the View props, ref, state attributes, and `inert` into the only child. |
+| `inert` | `boolean` | `false` | The inert value used while Collapsed is active; always `true` while inactive. |
+
+Collapsed also supports native `div` attributes.
+
+#### Data attributes
+
+| Attribute | Value | Condition |
+| --- | --- | --- |
+| `data-fit-inactive` | `""` | Present when Collapsed is not the current mode. |
+
+### Expanded
+
+Declares the preferred complete view whose required width is measured. It renders a `div` by default.
+
+**Default element:** `div`  
+**Ref:** `HTMLElement`  
+**Supports `asChild`:** Yes
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `asChild` | `boolean` | `false` | Merges the View props, ref, state attributes, and `inert` into the only child. |
+| `inert` | `boolean` | `false` | The inert value used while Expanded is active; always `true` while inactive. |
+
+Expanded also supports native `div` attributes.
+
+#### Data attributes
+
+| Attribute | Value | Condition |
+| --- | --- | --- |
+| `data-fit-inactive` | `""` | Present when Expanded is not the current mode. |
+| `data-fit-invalidated` | `""` | Temporarily present when the visible Expanded view switches to Collapsed because its own width changed. |
+
+## Boundaries
+
+- A FitSwitch should contain one Collapsed and one Expanded. A complete measurement relationship cannot be established if either View is missing.
+- The HTMLElements rendered by Collapsed and Expanded must be direct children of the same parent.
+- The shared parent's content box must represent all width available to the Views.
+- Expanded's border box must represent the width required by its complete content and preserve the same width semantics in both active and inactive states.
+- The inactive View must leave normal flow while remaining measurable; it must not use `display: none`.
+- View margins, visual transforms, outlines, and box shadows are not included in the width decision.
+- CSS `contain: size`, `display: contents`, absolutely positioned child content excluded from size calculation, and differing horizontal writing modes are outside the stable measurement model.
+- Both Views remain mounted, so business state, DOM IDs, and form semantics must be designed for two independent subtrees.
+
+## Related
+
+- [OverflowList](./overflow-list): preserves a continuous leading set of actions and passes trailing action data to a custom overflow renderer.
+- [FitSwitch Lab](../lab/fit-switch): observes switching behavior while the width and content of many instances change continuously.

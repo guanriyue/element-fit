@@ -1,0 +1,13 @@
+---
+description: Observe CompactGrid measurement performance across many instances.
+outline: false
+pageType: doc-wide
+---
+
+import { CompactGridStressTest } from '@/stress-tests/compact-grid';
+
+# CompactGrid Stress Test
+
+This page can render 20, 50, 100, 200, 300, or 500 instances and switch between `CompactGrid` and a plain CSS Grid baseline. Change Item counts or container widths in bulk to observe FPS while column counts and compact state are recalculated. Extra actions in the CSS baseline render as ordinary grid items and do not simulate `ExtraSlot` content movement.
+
+<CompactGridStressTest />

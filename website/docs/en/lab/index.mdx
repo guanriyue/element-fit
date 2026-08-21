@@ -1,0 +1,28 @@
+---
+description: Observe Element Fit under bulk rendering, continuous changes, and alternative implementations.
+outline: false
+pageType: doc-wide
+---
+
+# Lab
+
+The Lab provides browser pages for observing measurement behavior while many components render together or while content and container width change. It also preserves alternative implementations that have not become public components. These pages are not introductory examples, and their results are not fixed performance benchmarks.
+
+Each component page can adjust the number of rendered instances. Pages with a comparable baseline can also switch between the component and the baseline implementation. The FPS indicator in the upper-right corner helps observe frame-rate changes during interaction.
+
+## Performance observation
+
+- [CompactGrid](./compact-grid)
+- [FitSwitch](./fit-switch)
+- [OverflowList](./overflow-list)
+- [InlineOverflow](./inline-overflow)
+- [LineClamp](./line-clamp)
+- [Textarea](./textarea)
+
+## Combined scenario
+
+[Real-World Scenario](./real-world) places several adaptive components inside cards, tables, and detail panels to observe a mixed layout closer to an application page.
+
+## Experimental implementations
+
+[OverflowList DOM Scheduling Experiment](./overflow-list-dom) uses a layout algorithm similar to the public component but controls Items and Accessories through direct DOM writes. It exists only to compare the performance and constraints of different commit mechanisms and is not part of the public API.

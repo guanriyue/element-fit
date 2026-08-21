@@ -1,0 +1,206 @@
+---
+description: LineClamp limits the visible lines of inline content and composes a custom Suffix when the content exceeds that limit.
+outline: true
+pageType: doc
+---
+
+# LineClamp
+
+`LineClamp` limits the visible lines of inline content and renders a Suffix only when the content actually exceeds that limit. The component handles multiline truncation, overflow measurement, and last-line Suffix placement. The consumer controls expanded state, interaction, and visual styles.
+
+## When to use
+
+LineClamp is suitable for article summaries, descriptions, comment previews, and other multiline content that needs an expand affordance:
+
+- Limit the visible body text while collapsed.
+- Show an expand action, details link, or another hint only when the body exceeds the limit.
+- Preserve whether content exceeds the specified line count after expansion.
+- Work with body content composed mainly of text and ordinary inline nodes.
+
+Use CSS line-clamp directly when only fixed-line clipping is needed and neither overflow state nor a Suffix is required. Rich content involving complex blocks, bidi, ruby, or independent layout rules should be verified separately in target browsers.
+
+## Import
+
+```tsx
+import { LineClamp } from '@guanriyue/react-fit/line-clamp';
+```
+
+## Basic usage
+
+`expanded` is controlled state. Changing `expanded` switches the current presentation without changing the `lines` baseline used to measure overflow.
+
+The example below lets you change the container width and line count, and switch among collapsed, expanded, and unclamped states.
+
+```tsx file="<root>/src/demos/line-clamp/basic.tsx" preview
+
+```
+
+When content does not exceed `lines`, the full body is shown and Suffix is not rendered. When it does exceed the limit:
+
+- `expanded={false}`: the body is limited to the specified line count and Suffix appears near the final visible line.
+- `expanded={true}`: the full body is shown and Suffix follows it as ordinary inline content.
+
+LineClamp does not manage expanded state or add click behavior to Suffix. The consumer supplies button labels, events, and state storage.
+
+## Layout state
+
+Root exposes the current layout mode through `data-state`:
+
+| Value | Condition |
+| --- | --- |
+| `collapsed` | `lines` is a positive integer and `expanded={false}`. |
+| `expanded` | `lines` is a positive integer and `expanded={true}`. |
+| `unclamped` | `lines` is omitted or is not a positive integer. |
+
+`data-state` describes the layout mode, not whether the body overflows. With valid `lines` and no expansion, the state remains `collapsed` even if all content fits. Obtain the overflow result through `onOverflowChange`.
+
+The example below styles each state through `data-state` and compares ordinary wrapping with `word-break: break-all`:
+
+```tsx file="<root>/src/demos/line-clamp/style-control.tsx" preview
+
+```
+
+## Overflow state
+
+`onOverflowChange` is called after the first reliable measurement and subsequently only when the measured overflow boolean changes. Overflow means that the body exceeds the `lines` baseline; it does not mean that the expanded UI is still visually clipped.
+
+Changing `expanded` does not reset overflow to `false`. Changing `lines`, Root's available width, or the body content updates the measurement baseline or invalidates the existing result.
+
+```tsx file="<root>/src/demos/line-clamp/overflow-state.tsx" preview
+
+```
+
+Before the first reliable measurement completes, internal overflow is `false` and Suffix does not render. With many instances, measurement tasks far from the viewport may complete later.
+
+## Suffix
+
+Suffix can be an expand button, details link, status hint, or other compact inline content. It renders only when `lines` is valid and the body overflows, and the component wraps it in a `span`.
+
+```tsx file="<root>/src/demos/line-clamp/suffix.tsx" preview
+
+```
+
+In the collapsed state, float layout places Suffix near the final visible line. Suffix occupies space on that line, so it should remain compact and generally no taller than one line. Wider or taller content can displace the body or change the visual result of the final line.
+
+Expanded and collapsed states use different Suffix wrappers and DOM positions. Switching `expanded` remounts the wrapper and its subtree, so component state, effects, uncontrolled form state, and refs inside Suffix do not survive the switch. Lift state outside LineClamp when it must be preserved.
+
+Suffix is not part of the measured body. Changing it does not alter the baseline that determines whether the body exceeds `lines`.
+
+## Inline content
+
+`children` may contain text, links, emphasis, `code`, `inline-block` elements, `<br />`, and other inline content. These body nodes collectively form line geometry through the browser's actual layout.
+
+```tsx file="<root>/src/demos/line-clamp/inline-content.tsx" preview
+
+```
+
+Complex inline boxes, forced line breaks, and differences in browser Range rectangles can affect line counting. The default measurement strategy recognizes a `<br />` hard line break. Forced breaks created by CSS, preserved newline characters, or block-level boxes do not have the same stable boundary.
+
+## Measurement strategies
+
+`measureStrategy` provides two ways to measure body overflow:
+
+| Strategy | Measurement | Characteristics |
+| --- | --- | --- |
+| `in-place` | Reads the current body's line rectangles with Range. | Default; creates no temporary measurement node and reads directly from the current DOM. |
+| `clone` | Clones the body into a temporary node and lays it out at Root's content-box width. | Is not directly affected by the visible Suffix, but creates temporary DOM and adds a layout. |
+
+```tsx file="<root>/src/demos/line-clamp/measure-strategy.tsx" preview
+
+```
+
+### in-place
+
+`in-place` uses `Range.getClientRects()` to read the layout fragments formed by the current body and merges them into visible lines according to vertical overlap. In the collapsed state, the floated Suffix can push part of the last line onto an additional line. The component compares the widths of the last visible line and first hidden line to distinguish body overflow from an extra line caused by Suffix occupying space.
+
+This strategy depends on the Range rectangles exposed for the current DOM. Complex inline boxes, bidi, ruby, atomic inline-level elements, and special wrapping rules may produce browser-specific results.
+
+### clone
+
+`clone` temporarily creates an invisible fixed-position node, copies only the body content, and lays it out at Root's content-box width. The measurement node is created and removed through DOM APIs and does not add another React component render.
+
+The clone does not copy runtime form state or canvas drawing, and cannot fully reproduce selectors and layout relationships that depend on the original DOM hierarchy. `clone` is a different measurement tradeoff, not a complete simulation of arbitrary DOM and CSS.
+
+The default is `in-place`. Try `clone` when the current body cannot produce a stable in-place result. If neither strategy fits the content, provide a specialized layout for that content.
+
+Changing `measureStrategy` at runtime switches measurement stores, reconnects Root, and establishes a result for the new strategy. Avoid switching strategies repeatedly during continuous animation.
+
+## Styling and layout
+
+Root always renders a `div`. The component does not set `word-break`, `overflow-wrap`, `white-space`, fonts, or line height in the normal state. The consumer controls body wrapping and visual styles.
+
+The collapsed state sets the styles required for core truncation:
+
+- `display: -webkit-box`
+- `-webkit-box-orient: vertical`
+- `overflow: hidden`
+- `-webkit-line-clamp` based on `lines`
+
+The internal Spacer and Suffix also use float layout. Consumer `style` is merged after the internal styles and can override them. If `display`, `overflow`, `WebkitBoxOrient`, or `WebkitLineClamp` is overridden, the consumer must preserve the intended truncation and measurement semantics.
+
+Root should have a definite content-box width. Padding may provide visual spacing; the component measures the body using the width after padding is removed. Body line height should remain stable because Spacer uses Root's content height and `1lh` to move Suffix toward the final visible line.
+
+## Observation and remeasurement
+
+The component uses ResizeObserver to read Root's content box and MutationObserver to observe text and child-node changes in the Root subtree. The following changes update or re-establish the measurement result:
+
+- Root's content-box width changes.
+- `lines` changes.
+- Body text or child nodes change.
+- Root remounts.
+- `measureStrategy` changes.
+
+The internal Spacer, Suffix, and temporary clone are not body mutations. Mounting, unmounting, or changing them does not invalidate body measurement.
+
+MutationObserver does not observe attributes. If only a class, style, inherited style, font, pseudo-element content, or external stylesheet changes while Root's content-box width and body DOM remain unchanged, the component does not guarantee a new measurement.
+
+The component caches the latest width and overflow result and reuses it according to the monotonic relationship between available width and ordinary inline content. If a container query, media query, or another width-dependent rule simultaneously changes the body content or layout, ensure that this monotonic relationship still holds.
+
+## API reference
+
+### Root
+
+Renders the multiline body and optional Suffix. It always renders a `div`.
+
+**Default element:** `div`  
+**Ref:** `HTMLDivElement`  
+**Supports `asChild`:** No
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `children` | `ReactNode` | Required | Inline body content included in truncation and overflow measurement. |
+| `lines` | `number` | `undefined` | Maximum visible lines and overflow baseline; a value that is not a positive integer disables truncation, measurement, and Suffix. |
+| `expanded` | `boolean` | `false` | Whether to show the complete body; does not change the `lines` measurement baseline. |
+| `suffix` | `ReactNode` | `undefined` | Content rendered at the final line or end of the body when it overflows. |
+| `onOverflowChange` | `(overflow: boolean) => void` | `undefined` | Called after the first reliable measurement, then when overflow changes. |
+| `measureStrategy` | `'in-place' \| 'clone'` | `'in-place'` | Selects direct measurement of the current DOM or measurement with a temporary cloned node. |
+
+Root also supports native `div` attributes. Consumer `style` overrides internal properties with the same names.
+
+#### Data attributes
+
+| Attribute | Value | Condition |
+| --- | --- | --- |
+| `data-state` | `collapsed` | `lines` is valid and `expanded` is `false`. |
+| `data-state` | `expanded` | `lines` is valid and `expanded` is `true`. |
+| `data-state` | `unclamped` | `lines` is omitted or is not a positive integer. |
+
+## Boundaries
+
+- `lines` must be a positive integer; other values enter the `unclamped` state.
+- LineClamp targets multiline inline content in horizontal writing modes and does not provide general block-subtree truncation.
+- Root always renders a `div` and does not support `asChild`.
+- Suffix renders only when the body overflows and remounts when switching between collapsed and expanded states.
+- Suffix should remain compact while collapsed; tall content is outside the stable final-line layout.
+- `in-place` recognizes only `<br />` as a hard-line-break boundary.
+- `clone` does not completely reproduce runtime DOM state or styles that depend on the original hierarchy.
+- Complex inline boxes, bidi, ruby, block-level boxes, and differences in browser Range rectangles must be verified with the target content.
+- Layout changes caused only by attributes, inherited styles, fonts, or external stylesheets do not guarantee remeasurement.
+
+## Related
+
+- [Range and Browser Geometry Measurement](../implementation/range-geometry): Range layout fragments and multiline rectangle aggregation.
+- [InlineOverflow](./inline-overflow): detects horizontal overflow in single-line content.
+- [LineClamp Lab](../lab/line-clamp): observes measurement behavior while the width, line count, and content of many instances change.

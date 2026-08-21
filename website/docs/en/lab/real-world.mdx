@@ -1,0 +1,13 @@
+---
+description: A combined application stress test with several adaptive components running together.
+outline: false
+pageType: doc-wide
+---
+
+import { RealWorldStressTest } from '@/stress-tests/real-world';
+
+# Real-World Scenario
+
+This page simulates an order-management interface using `CompactGrid`, `InlineOverflow`, `LineClamp`, and `FitSwitch`, with an option to switch the entire page to CSS baselines. The table can render 20, 50, 100, 200, 300, or 500 rows and intentionally does not use virtualization so that every instance remains mounted. It is intended for performance observation and is not a recommendation for implementing large production lists.
+
+<RealWorldStressTest />

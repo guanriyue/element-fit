@@ -1,0 +1,159 @@
+---
+description: Use Range to read subpixel widths and layout fragments from rendered DOM content, addressing precision gaps in browser sizing APIs.
+outline: true
+pageType: doc
+---
+
+# Range and Browser Geometry Measurement
+
+The browser performs font selection, text shaping, inline layout, wrapping, and ellipsis painting, but exposes only limited layout information to JavaScript. Element dimensions can describe boxes and scroll areas, yet cannot directly answer whether an ellipsis is visible or how many lines selected content forms.
+
+Range is commonly associated with text selection and editors, but it can also read DOM content that already participates in layout. Element Fit uses two Range geometry results:
+
+- `getBoundingClientRect()` obtains the bounding rectangle of all selected fragments.
+- `getClientRects()` preserves the individual layout fragments formed by the selected content.
+
+Range constructs no new layout and is not a general size calculator for arbitrary DOM subtrees. It lets a component continue using the real layout already performed by the browser while retrieving information unavailable from ordinary element dimensions.
+
+## Limited dimensions exposed by browsers
+
+A common overflow check compares:
+
+```ts
+element.scrollWidth > element.clientWidth
+```
+
+[`scrollWidth` and `clientWidth`](https://drafts.csswg.org/cssom-view/#extensions-to-the-element-interface) are exposed as the Web IDL type `long` in CSSOM View, so JavaScript receives integers. Internal text layout can still land on subpixel boundaries, which means equal integers do not always prove that all content is visible.
+
+The element's own `getBoundingClientRect()` cannot replace content measurement. It describes the element's border box, not the width required by clipped content before ellipsis.
+
+Browsers currently provide neither a general ellipsis-state query nor an API that calculates final CSS dimensions for an arbitrary DOM subtree before it participates in layout. Measurement logic must combine the dimensions available for the specific question.
+
+## Range geometry
+
+A Range describes selected content with DOM boundaries:
+
+```ts
+const range = document.createRange();
+
+range.selectNodeContents(content);
+```
+
+[`Range.getClientRects()` and `Range.getBoundingClientRect()`](https://drafts.csswg.org/cssom-view/#extensions-to-the-range-interface) are defined by CSSOM View. Text fragments and selected top-level element boxes produce a set of `DOMRect` objects:
+
+- `getClientRects()` returns the layout fragments.
+- `getBoundingClientRect()` returns the smallest rectangle enclosing all nonempty fragments.
+
+`DOMRect` coordinates and dimensions may contain fractions, allowing Range to preserve subpixel information absent from integer `scrollWidth` and `clientWidth`.
+
+## Correct precision near a single-line boundary
+
+Using Range for all content is unnecessary. A single-line overflow check can first calculate an integer dimension difference:
+
+```ts
+const difference = content.scrollWidth - availableContentWidth;
+```
+
+The current implementation uses `1 CSS px` as a conservative low-confidence interval:
+
+| Initial difference | Action |
+| --- | --- |
+| `difference >= 1` | Treat as overflowing. |
+| `difference <= -1` | Treat as not overflowing. |
+| `-1 < difference < 1` | Continue measurement with Range. |
+
+`1px` does not imply that browser error is fixed at `1px`. `0.5px` or `0.2px` may also be sufficient on some browser platforms; the current value chooses a more conservative correction range.
+
+In common single-line clipping layouts, `scrollWidth` often equals the available width exactly when content does not overflow. Equality means only that the integer dimensions agree and remains a low-confidence result. The selected content's fractional width can then be read:
+
+```ts
+const range = content.ownerDocument.createRange();
+
+range.selectNodeContents(content);
+
+const overflow =
+  range.getBoundingClientRect().width > availableContentWidth;
+```
+
+The Range API is one way to work around this class of browser sizing bug. It does not change integer rounding; it avoids relying exclusively on the `scrollWidth` and `clientWidth` decision path.
+
+## Platform issues and community discussion
+
+Boundary false negatives caused by integer dimensions appear in CSS standards discussion, browser issue trackers, and community practice:
+
+- [CSSWG issue #4123](https://github.com/w3c/csswg-drafts/issues/4123) discusses cases where an ellipsis appears while `scrollWidth`, `clientWidth`, or other geometry remains equal because of rounding.
+- [Chromium issue 41468858](https://issues.chromium.org/issues/41468858) is the corresponding Chromium tracking issue.
+- [Mozilla bug 1250824](https://bugzilla.mozilla.org/show_bug.cgi?id=1250824) records `scrollWidth` rounding with `overflow: hidden` and `text-overflow: ellipsis`.
+- [Stack Overflow: Wrong ellipsis detection with scrollWidth](https://stackoverflow.com/questions/71440290/wrong-elipsis-detection-with-scrollwidth-when-text-length-is-close-to-width) shows a community reproduction at a boundary width and an alternative based on a temporary DOM copy.
+
+Range correction does not mean these platform issues are fixed and cannot eliminate all browser differences. It uses another category of browser geometry to reduce boundary false negatives after the target content has completed layout.
+
+## Compare equivalent box models
+
+Range returns the selected content's geometry, so the comparison target must represent the space actually available to that content.
+
+When an outer container supplies available width, use its content-box width:
+
+```ts
+const availableContentWidth =
+  root.clientWidth - paddingInlineStart - paddingInlineEnd;
+```
+
+When content and container are the same element, the integer first pass can directly compare `scrollWidth` and `clientWidth`, both of which use padding-box semantics. At the Range correction boundary, convert available width to content-box width.
+
+Comparing Range width directly with border-box width incorrectly includes padding and borders in available space. Range provides finer geometric precision; it does not automatically correct the box-model semantics of both sides.
+
+## Reconstruct lines from layout fragments
+
+`getBoundingClientRect()` merges all fragments into one enclosing rectangle and therefore suits the total width of ordinary single-line content. Multiline content needs the positions of individual fragments:
+
+```ts
+const rects = Array.from(range.getClientRects());
+```
+
+One visual line can contain several rectangles from text, links, `inline-block`, and other nodes. The rectangle count cannot be treated as the line count. Current line measurement merges fragments according to overlap in the block direction:
+
+1. Ignore a rectangle whose width and height are both `0`.
+2. Find an existing line that overlaps the current rectangle vertically by more than `0.5 CSS px`.
+3. If found, add the rectangle as another inline interval on that line.
+4. Otherwise, create a new line.
+5. Finally, sort lines by `top`.
+
+Inline intervals within one line must then be sorted and overlapping ranges merged to obtain the line's actual horizontal extent. This preserves multiple fragments produced by mixed inline content and prevents one visual line from being counted several times.
+
+## Soft and forced line breaks
+
+Rectangles on two adjacent lines do not reveal why the line broke:
+
+- A **soft break** results from insufficient available width and can merge again when space grows.
+- A **forced break** results from `<br />` or another content rule and must remain separate even if both line widths would fit together.
+
+When measurement needs to distinguish these cases, create separate Ranges around each `<br />` and test whether they correspond to the target adjacent lines. The current implementation recognizes only `<br />` as an explicit hard-line-break boundary. Forced breaks produced by preserved newline characters, generated content, block-level boxes, or other CSS rules are outside the same detection range.
+
+## Difference from DOM mirrors
+
+Range reads a layout already formed by the current DOM. It does not clone, mount, or remove temporary nodes for measurement. This makes it suitable for observing current content width, fragments, and line information, and avoids extra rendered state from temporary DOM.
+
+Range cannot answer counterfactual layout questions. For example, if a current Suffix already affects body wrapping but the target question is how many lines the body would form without that Suffix, existing Range rectangles cannot provide the answer directly. Such cases must derive the original result from current fragments or establish an independent DOM mirror for a new layout.
+
+Reading Range geometry can still require the browser to update layout synchronously. With many instances, place geometry access in an explicit read stage and avoid interleaving it with DOM writes.
+
+## Boundaries
+
+Range geometry is based on currently rendered content:
+
+- Content with `display: none`, disconnected content, or content without a layout box cannot provide target dimensions.
+- Range selects DOM content; pseudo-elements are not selectable nodes.
+- Margins are outside the selected element's border area.
+- Positioning and transforms can give visual extents different semantics from content dimensions.
+- A multiline bounding rectangle encloses every fragment and is not the content's intrinsic single-line width.
+- Bidi, ruby, atomic inline-level elements, and vertical writing modes can produce more complex rectangles.
+
+Range geometry can itself differ among browsers. For example, WebKit [issue #296765](https://bugs.webkit.org/show_bug.cgi?id=296765) records problems in `getClientRects()` and `getBoundingClientRect()` results for wrapped text. Range is a way to use the browser's limited layout capabilities for measurement, not an absolute cross-browser source of dimensions.
+
+## Used by
+
+- [InlineOverflow](../guide/inline-overflow) uses `getBoundingClientRect()` to correct single-line overflow when integer dimensions fall in a low-confidence interval.
+- [LineClamp](../guide/line-clamp) uses `getClientRects()` to obtain body fragments and reconstruct visible lines by vertical overlap.
+- [InlineOverflow Lab](../lab/inline-overflow) shows differences between integer dimensions and Range width near a boundary.
+- [LineClamp Lab](../lab/line-clamp) shows Range measurement across many instances of multiline content.

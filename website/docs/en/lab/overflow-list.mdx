@@ -1,0 +1,15 @@
+---
+description: Observe OverflowList measurement and conditional-rendering performance across many instances.
+outline: false
+pageType: doc-wide
+---
+
+import { OverflowListStressTest } from '@/stress-tests/overflow-list';
+
+# OverflowList Stress Test
+
+This page can render 10, 20, 30, 50, 100, 200, 300, or 500 `OverflowList` instances. Change action labels in bulk, conditionally add or remove actions, switch container widths, or resize continuously to observe FPS during synchronous layout measurement and overflow-data updates.
+
+The component has no equivalent pure-CSS behavioral baseline, so this page shows only the component implementation. Every Accessory uses a constant-width ellipsis button. The overflow count is written only to the accessible label and native title and does not participate in width calculation.
+
+<OverflowListStressTest />

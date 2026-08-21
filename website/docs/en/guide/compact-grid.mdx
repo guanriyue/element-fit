@@ -1,0 +1,227 @@
+---
+description: CompactGrid moves extra content into the last valid slot when the adaptive Grid fills the current row.
+outline: true
+pageType: doc
+---
+
+# CompactGrid
+
+`CompactGrid` uses the same adaptive Grid layout as [FitGrid](./fit-grid) and adds `Extra` and `ExtraSlot` to handle extra content that would otherwise fall onto a row of its own.
+
+In the non-compact state, `Extra` is an independent Grid Item under Root. When regular Items exactly fill the current row and Extra would occupy the next row alone, the component enters the compact state and renders Extra's children inside the last valid `ExtraSlot`.
+
+## When to use
+
+CompactGrid suits query forms, filter areas, and settings panels. Primary fields wrap according to container width, while reset, help, or secondary actions occupy their own cell when space allows and move inside the last field otherwise.
+
+It is particularly useful when:
+
+- Primary content continues to use a Grid with a shared minimum column width.
+- One group of extra content needs to switch between a default and a compact location.
+- Trailing fields are conditionally rendered and the extra content should fall back to the last remaining valid slot.
+- Extra's children may remount when their location changes.
+
+If you only need CSS to wrap columns automatically, prefer FitGrid. If the extra content must preserve internal state, focus, or uncontrolled form values, use one stable node and design a dedicated application layout.
+
+## Import
+
+```tsx
+import { CompactGrid } from '@guanriyue/react-fit/compact-grid';
+```
+
+## Basic usage
+
+The example below declares the Reset button as Extra. When it fits on the current row, it occupies an independent Grid cell. When ordinary Items fill the final row, it moves into the last valid ExtraSlot in the Status or Amount Range field.
+
+You can change the container width, minimum Item width, column limits, and gaps, and conditionally render fields, Extra, and candidate Slots.
+
+```tsx file="<root>/src/demos/compact-grid/filter-actions.tsx" preview
+
+```
+
+## Composition
+
+```tsx
+<CompactGrid minItemWidth="14rem" maxColumns={3}>
+  <CompactGrid.Item>
+    <Field name="keyword" />
+  </CompactGrid.Item>
+
+  <CompactGrid.Item>
+    <Field name="status" />
+    <CompactGrid.ExtraSlot />
+  </CompactGrid.Item>
+
+  <CompactGrid.Extra>
+    <button type="reset">Reset</button>
+  </CompactGrid.Extra>
+</CompactGrid>
+```
+
+- `Item` declares a Grid Item that participates in compact calculation and can provide `colSpan`.
+- `Extra` declares the default Grid location of the extra content. One Root supports one Extra.
+- `ExtraSlot` declares a candidate location for Extra in the compact state. Multiple slots are allowed.
+
+Item and Extra should be sibling direct children of Root. ExtraSlot should be inside a direct Item and may appear at any depth within that Item's descendants.
+
+## Compact condition
+
+CompactGrid enters the compact state when all of these conditions are met:
+
+1. Extra's children are not `null`, `undefined`, or `false`.
+2. Root contains at least one ExtraSlot.
+3. The last ExtraSlot in DOM order is inside the last valid Item.
+4. After each Item's span is accounted for, the last valid Item exactly fills the current row.
+
+The final condition means Extra would start on the next row if it remained an independent Grid Item. Extra then returns `null`, and its children render inside the active ExtraSlot.
+
+When multiple ExtraSlots exist, the last Slot in DOM order is active. If a later field is conditionally removed, the active Slot falls back to the previous candidate that remains mounted. The native `hidden` attribute hides all Slots in the non-compact state and all non-active Slots.
+
+## Moving Extra
+
+CompactGrid moves `Extra.children`, not the wrapper rendered at Extra's default location. `className`, `style`, and other DOM props passed to `CompactGrid.Extra` only belong to the default `div` in the non-compact state. The compact state uses the ExtraSlot element and its props.
+
+Place a wrapper inside children when both locations need the same wrapper styles:
+
+```tsx
+<CompactGrid.Extra>
+  <div className="actions">
+    <button type="reset">Reset</button>
+  </div>
+</CompactGrid.Extra>
+```
+
+When Extra switches between its default location and ExtraSlot, its children unmount and remount at a different React position. Component state, uncontrolled form state, and current focus are not preserved.
+
+## Spanning Items
+
+`CompactGrid.Item` uses `colSpan` to declare how many columns the current item occupies. A positive integer spans that many columns, while `'full'` spans the full row.
+
+If a numeric span is greater than the current explicit column count, CompactGrid clamps it to a full row. For example, with one current column, `colSpan={2}` is equivalent to `colSpan="full"` and does not create visible implicit columns.
+
+The example below lets you change the `colSpan` of Contact Address and conditionally render regular Items, full-row Items, Extra, and Slots:
+
+```tsx file="<root>/src/demos/compact-grid/col-span.tsx" preview
+
+```
+
+Ordinary elements may also be direct children of Root and participate in compact calculation as `span: 1`. The component does not read an ordinary element's own `grid-column`. Use `CompactGrid.Item` when the visual span and internal calculation must agree.
+
+## Layout and styling
+
+Root uses the same `repeat(auto-fit, minmax(..., 1fr))` column layout as FitGrid. `minItemWidth`, `minColumns`, `maxColumns`, `colGap`, and `rowGap` have the same column-width semantics.
+
+Root sets these required properties through inline styles:
+
+- `display: grid`
+- `grid-template-columns`
+- `grid-auto-columns: 0px`
+- `column-gap`
+- `row-gap`
+
+They override properties with the same names in the supplied `style`; other inline styles are preserved. `grid-auto-columns: 0px` prevents an out-of-range numeric span from creating visible implicit columns and keeps explicit-column measurement stable.
+
+Numeric lengths are interpreted as pixels. Strings are forwarded as CSS lengths. `minColumns` and `maxColumns` only accept positive integers; invalid values are ignored with a development warning.
+
+## State and remeasurement
+
+CompactGrid observes Root with ResizeObserver and reads the current explicit column count from computed `grid-template-columns`. After Root changes size, the component reevaluates the active Slot and compact condition.
+
+These structural changes also schedule a recalculation:
+
+- A CompactGrid.Item mounts, unmounts, or changes `colSpan`.
+- An ExtraSlot mounts, unmounts, or replaces its final DOM element.
+- Extra mounts, unmounts, or receives a new children reference.
+
+The component does not use MutationObserver to observe ordinary children of Root. Adding, removing, or moving an unregistered ordinary element without changing Root's own size does not guarantee an immediate compact-state recalculation. Use CompactGrid.Item for nodes in a dynamic list that must participate in calculation.
+
+Before the first layout measurement completes, Extra appears at its default Grid location and ExtraSlot remains hidden. After the component obtains the column count and layout structure, Extra's children move into the active Slot if the compact condition is met.
+
+## API reference
+
+### Root
+
+Provides the adaptive Grid and compact-state context. Renders a `div` by default.
+
+**Default element:** `div`  
+**Ref:** `HTMLDivElement`  
+**Supports `asChild`:** Yes
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `minItemWidth` | `number \| string` | Required | The minimum width each Grid Item should normally keep before the column count decreases; numbers are interpreted as px. |
+| `minColumns` | `number` | `undefined` | Minimum number of columns to try to preserve; accepts positive integers only. |
+| `maxColumns` | `number` | `undefined` | Maximum number of columns the current Grid may create; accepts positive integers only. |
+| `colGap` | `number \| string` | `0` | Column gap; numbers are interpreted as px. |
+| `rowGap` | `number \| string` | `colGap` | Row gap; numbers are interpreted as px. |
+| `asChild` | `boolean` | `false` | Merges Root props, ref, and required styles into its only child. |
+
+Root also accepts native `div` props.
+
+### Item
+
+Declares a Grid Item that participates in compact calculation. Renders a `div` by default.
+
+**Default element:** `div`  
+**Ref:** `HTMLDivElement`  
+**Supports `asChild`:** Yes
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `colSpan` | `number \| 'full'` | `undefined` | Number of columns occupied by this Item; values beyond the current explicit column count are treated as a full row. |
+| `asChild` | `boolean` | `false` | Merges Item props, ref, registration behavior, and spanning styles into its only child. |
+
+Item also accepts native `div` props. A `grid-column` generated from a valid `colSpan` overrides a property with the same name in the supplied `style`.
+
+### Extra
+
+Declares extra content and its default Grid location. Renders a `div` by default and returns `null` in the compact state.
+
+**Default element:** `div`  
+**Ref:** `HTMLDivElement`  
+**Supports `asChild`:** Yes
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `children` | `ReactNode` | `undefined` | Content that switches between the default location and the active ExtraSlot. |
+| `asChild` | `boolean` | `false` | In the non-compact state, merges Extra props and ref into its only child. |
+
+Extra also accepts native `div` props. `null`, `undefined`, and `false` children are treated as no Extra, so the component does not enter the compact state.
+
+### ExtraSlot
+
+Declares a candidate location for Extra in the compact state. Renders a `span` by default. ExtraSlot remains mounted and uses `hidden` when inactive.
+
+**Default element:** `span`  
+**Ref:** `HTMLSpanElement`  
+**Supports `asChild`:** Yes
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `hidden` | `boolean` | `false` | Forces this Slot to remain hidden; it cannot force a non-active Slot to become visible. |
+| `asChild` | `boolean` | `false` | Merges Slot props, ref, hidden state, and registration behavior into its only child. |
+
+The active Extra supplies ExtraSlot's content. Do not pass children to ExtraSlot. ExtraSlot also accepts native `span` props.
+
+## Boundaries
+
+- Ordinary layout children of Root must be elements; do not place text nodes directly under Root.
+- CompactGrid supports one Extra. Multiple Extras compete for the same internal content state and are unsupported.
+- Item and Extra should be sibling direct children of Root and should not contain one another. An Item should not contain another Item.
+- The active ExtraSlot must be inside the last valid Item, or the compact state will not be entered.
+- Ordinary elements always count as one column; the component does not read their custom spanning styles.
+- Extra's wrapper element does not move. Its children remount when the location changes.
+- CSS `order` and other visual reordering do not change the DOM-order semantics of Item and ExtraSlot.
+
+## Related
+
+- [FitGrid](./fit-grid): adapts the column count using CSS Grid without observing compact state or moving extra content.
+- [CompactGrid Lab](../lab/compact-grid): observe many instances during continuous width and content changes.

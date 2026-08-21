@@ -1,0 +1,161 @@
+---
+description: FitGrid uses CSS Grid to adjust the column count from each Item's minimum usable width.
+outline: true
+pageType: doc
+---
+
+# FitGrid
+
+`FitGrid` is a lightweight CSS Grid layout component. `minItemWidth` expresses the minimum acceptable width of each column, and the browser chooses the number of columns from the space currently available to FitGrid.
+
+The component does not read DOM dimensions, observe Resize events, or update React state when its container changes. React only derives `grid-template-columns`, gaps, and Item placement styles from props. CSS Grid handles all subsequent responsive layout.
+
+## When to use
+
+`FitGrid` suits filter forms, settings panels, and card lists where items share a minimum usable width but the layout may appear in a main area, sidebar, dialog, or other containers with different widths.
+
+It is particularly useful when:
+
+- The layout should respond to the element's own available width instead of a viewport breakpoint.
+- Columns can share remaining space evenly and use the same minimum width.
+- The browser only needs to wrap columns automatically; React does not need the current column count.
+- A small number of Items need to span columns or be pinned to the end of the current row.
+
+If you need the current column count, or need to move extra content to another node in a compact state, use [CompactGrid](./compact-grid), which builds on the same Grid layout.
+
+## Import
+
+```tsx
+import { FitGrid } from '@guanriyue/react-fit/fit-grid';
+```
+
+## Basic usage
+
+The query form below displays at most four columns. Resize the container to see fields and actions wrap without a viewport breakpoint. The final action area uses `FitGrid.Item pin="row-end"` to occupy the end of the current row.
+
+```tsx file="<root>/src/demos/fit-grid/query-form.tsx" preview
+
+```
+
+## Item layout
+
+Ordinary element children of FitGrid naturally become Grid Items. Use `FitGrid.Item` only when you need a column span, end-of-row placement, or an additional wrapper element.
+
+### Spanning columns
+
+`colSpan` accepts a positive integer or `'full'`. A number generates the corresponding `grid-column: span n`; `'full'` stretches the Item from the first grid line to the last.
+
+```tsx
+<FitGrid minItemWidth="12rem">
+  <FitGrid.Item colSpan={2}>Spans two columns</FitGrid.Item>
+  <FitGrid.Item colSpan="full">Spans the full row</FitGrid.Item>
+</FitGrid>
+```
+
+FitGrid does not clamp a numeric `colSpan` to the current column count. If the requested span is greater than the explicit column count, CSS Grid may create implicit columns or produce unexpected auto-placement. Use `CompactGrid.Item` when an out-of-range span should fall back to a full row.
+
+### Pinning to the row end
+
+`pin="row-end"` places an Item in the last column of the current explicit Grid. It is useful for submit and reset actions at the end of a query form.
+
+```tsx
+<FitGrid.Item pin="row-end">
+  <button type="submit">Search</button>
+</FitGrid.Item>
+```
+
+`pin` is intended for the final child in a layout group. After an intermediate node is pinned to the row end, CSS Grid controls how the remaining Items are auto-placed. If both `pin` and `colSpan` are provided, `pin` takes precedence and a development warning is emitted.
+
+## Layout and styling
+
+### Column count and width
+
+FitGrid generates columns with `repeat(auto-fit, minmax(..., 1fr))`. `minItemWidth` supplies the usual minimum track size, while Grid continues to distribute the available space evenly.
+
+- `minColumns` asks the layout to preserve at least the specified number of columns. When space is insufficient, columns may become narrower than `minItemWidth`.
+- `maxColumns` increases the minimum track size to limit how many columns can be formed in the available space.
+- When both are set, the generated track size accounts for the minimum count, maximum count, `minItemWidth`, and column gap together.
+- `auto-fit` collapses empty tracks with no Item, so the final visible count still depends on the number of children.
+
+`minColumns` and `maxColumns` only accept positive integers. Invalid values are ignored with a development warning. If `maxColumns` is smaller than `minColumns`, the component warns but still uses both original values to generate the Grid formula.
+
+### Required styles
+
+Root sets these properties through inline styles:
+
+- `display: grid`
+- `grid-template-columns`
+- `column-gap`
+- `row-gap`
+
+They are part of FitGrid's layout model and override properties with the same names in the supplied `style`. Other inline styles are preserved.
+
+Numeric `minItemWidth`, `colGap`, and `rowGap` values are interpreted as pixels. Strings are forwarded as CSS lengths, so values such as `rem`, CSS variables, and `calc()` are supported.
+
+## Layout updates
+
+When the container width changes, the browser recalculates CSS Grid directly, without a ResizeObserver, React state, or a component scheduler. Changing `minItemWidth`, column limits, or gap props makes React generate new inline Grid styles.
+
+FitGrid has no internal layout state. It does not expose a current-column callback or state data attributes. The complete Grid styles are present on the first render, with no size measurement required.
+
+## API reference
+
+### Root
+
+Contains the adaptive Grid and renders a `div` by default.
+
+**Default element:** `div`  
+**Ref:** `HTMLDivElement`  
+**Supports `asChild`:** Yes
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `minItemWidth` | `number \| string` | Required | The minimum width each Grid Item should normally keep before the column count decreases; numbers are interpreted as px. |
+| `minColumns` | `number` | `undefined` | Minimum number of columns to try to preserve; accepts positive integers only. |
+| `maxColumns` | `number` | `undefined` | Maximum number of columns the current Grid may create; accepts positive integers only. |
+| `colGap` | `number \| string` | `0` | Column gap; numbers are interpreted as px. |
+| `rowGap` | `number \| string` | `colGap` | Row gap; numbers are interpreted as px. |
+| `asChild` | `boolean` | `false` | Merges FitGrid props, ref, and required styles into its only child. |
+
+Root also accepts native `div` props. `className`, event handlers, and non-layout inline styles are forwarded to the final element. With `asChild`, the only child must accept props and a ref.
+
+FitGrid does not expose state data attributes.
+
+### Item
+
+Declares column spanning or end-of-row placement for one Grid Item. It is also available as the named `FitGridItem` export and renders a `div` by default.
+
+```tsx
+import { FitGrid, FitGridItem } from '@guanriyue/react-fit/fit-grid';
+```
+
+**Default element:** `div`  
+**Ref:** `HTMLDivElement`  
+**Supports `asChild`:** Yes
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `colSpan` | `number \| 'full'` | `undefined` | Spans the specified number of columns, or uses `'full'` to span the full row; numbers must be positive integers. |
+| `pin` | `'row-end'` | `undefined` | Places the Item in the last column of the current explicit Grid; takes precedence over `colSpan`. |
+| `asChild` | `boolean` | `false` | Merges Item props, ref, and placement styles into its only child. |
+
+Item also accepts native `div` props. The `grid-column` generated by `colSpan` or `pin` overrides a property with the same name in the supplied `style`; other inline styles are preserved.
+
+FitGrid.Item does not expose state data attributes.
+
+## Boundaries
+
+- FitGrid derives all columns from one shared `minItemWidth`; individual Items cannot declare different minimum track sizes.
+- The component does not read or report the current column count and cannot conditionally render content from that count.
+- You are responsible for `grid-column` on ordinary children. FitGrid does not read those styles or adjust other Items around them.
+- A numeric `colSpan` greater than the current explicit column count does not automatically fall back to a full row.
+- `pin="row-end"` is intended for the end of a layout group. Applying it to an intermediate node can affect the auto-placement of later Items.
+- FitGrid treats every direct child as one complete Grid Item. Labels, controls, and help text inside a field should be laid out by that Item.
+
+## Related
+
+- [CompactGrid](./compact-grid): observes the current column count and adds compact placement through Extra and ExtraSlot on top of the same Grid logic.

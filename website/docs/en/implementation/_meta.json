@@ -1,0 +1,37 @@
+[
+  {
+    "type": "file",
+    "name": "index",
+    "label": "Overview"
+  },
+  {
+    "type": "file",
+    "name": "css-grid-implicit-columns",
+    "label": "CSS Grid Implicit Columns"
+  },
+  {
+    "type": "file",
+    "name": "dom-mirror-measurement",
+    "label": "DOM Mirror Measurement"
+  },
+  {
+    "type": "file",
+    "name": "layout-task-scheduling",
+    "label": "Staged Layout Task Batching"
+  },
+  {
+    "type": "file",
+    "name": "range-geometry",
+    "label": "Range Geometry Measurement"
+  },
+  {
+    "type": "file",
+    "name": "style-observation",
+    "label": "Observing Style Changes and Invalidating Measurements"
+  },
+  {
+    "type": "file",
+    "name": "viewport-priority-scheduling",
+    "label": "Viewport-Priority Task Scheduling"
+  }
+]

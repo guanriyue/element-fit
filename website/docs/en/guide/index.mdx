@@ -1,0 +1,43 @@
+---
+description: Usage guides and interactive examples for Element Fit components.
+outline: true
+pageType: doc
+---
+
+# Component Guides
+
+Element Fit organizes responsive layouts around the actual space available to an element. Applications do not need to map every container to a viewport breakpoint first. Grids, content, and actions can instead choose how to render from the width of the element that contains them.
+
+The components fall broadly into two groups. `FitGrid` composes CSS Grid capabilities and lets the browser perform the adaptive layout directly. The other components measure actual DOM dimensions, content changes, or overflow state while leaving visual styling and application interactions under your control.
+
+## Choose a component
+
+| Goal | Recommended component |
+| --- | --- |
+| Adjust the number of Grid columns from the minimum usable width of each item | [FitGrid](./fit-grid) |
+| Move extra actions into the last valid slot when a Grid becomes compact | [CompactGrid](./compact-grid) |
+| Select the full or compact view that fits | [FitSwitch](./fit-switch) |
+| Keep leading actions visible and hand trailing actions to a custom menu | [OverflowList](./overflow-list) |
+| Detect horizontal overflow in single-line content and compose a Tooltip or Accessory | [InlineOverflow](./inline-overflow) |
+| Limit visible lines of inline content and render a suffix on overflow | [LineClamp](./line-clamp) |
+| Preserve native textarea usage while adapting height to content and width | [Textarea](./textarea) |
+
+## Components that are easy to confuse
+
+### FitGrid and CompactGrid
+
+`FitGrid` only generates an adaptive Grid from a minimum item width. `CompactGrid` uses the same column layout, observes the current column count and item structure, and moves `Extra` into the last valid `ExtraSlot` when the compact condition is met.
+
+### FitSwitch and OverflowList
+
+`FitSwitch` switches between two complete views, such as “icon and label” and “icon only.” `OverflowList` handles an ordered set of actions: when space runs out, it keeps a contiguous prefix of Items and gives the trailing Items' application data back to the renderer for an overflow menu.
+
+### InlineOverflow and LineClamp
+
+`InlineOverflow` observes whether single-line content overflows horizontally and does not provide clipping styles. `LineClamp` handles multiline inline content and owns line limiting, overflow measurement, and final-line suffix layout.
+
+## Reading path
+
+- When adopting a component, start with its page in this section for examples, API details, styling responsibilities, and boundaries.
+- To understand measurement precision, invalidation, layout scheduling, or browser behavior, read [Implementation](../implementation/).
+- To observe large instance counts, continuous resizing, or alternative implementations, open the [Lab](../lab/). Lab results support analysis and are not fixed performance benchmarks.

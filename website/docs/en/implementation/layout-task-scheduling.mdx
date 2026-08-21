@@ -1,0 +1,165 @@
+---
+description: Organize layout transactions into global read and write stages to reduce synchronous layout caused by interleaved DOM access and coordinate synchronous React commits.
+outline: true
+pageType: doc
+---
+
+# Staged Layout Task Batching
+
+Browsers can defer DOM and style writes, then update layout together before painting. If synchronous code repeatedly writes DOM and immediately reads geometry that depends on layout, the browser must resolve pending style and layout work early.
+
+Executing independent tasks instance by instance easily produces this sequence:
+
+```text
+read A → write A → read B → write B → read C → write C
+```
+
+Each layout read after a write can trigger forced reflow. Element Fit organizes tasks in the same batch into global read and write stages:
+
+```text
+read A → read B → read C → write A → write B → write C
+```
+
+This order reduces transitions between reads and writes and lets multiple tasks share layout the browser has already resolved. It reduces opportunities for synchronous layout; it does not guarantee a fixed number of Layout events. React commits, style invalidation, multiple documents, and code outside these tasks can still introduce additional layout.
+
+## Tasks create plans at execution time
+
+A layout task is a stable function. The scheduler invokes it when processing actually begins and obtains an execution plan:
+
+```ts
+type LayoutTask = () => LayoutTaskPlan | undefined;
+
+type LayoutTaskPlan = {
+  stages: readonly LayoutTaskStage[];
+  cleanup?: () => void;
+};
+
+type LayoutTaskStage = {
+  read?: () => void;
+  write?: () => void;
+  flushSync?: boolean;
+};
+```
+
+Because the task function runs only when the queue flushes, it can read the latest nodes, configuration, and caches without capturing state in a new closure at scheduling time. Returning `undefined` means no work remains under the current conditions.
+
+The scheduler creates plans for every task in the current batch before starting any stage. These plans form a fixed execution snapshot; requests produced during execution do not alter stages that have already begun.
+
+## Align every task by stage
+
+Tasks may return different numbers of stages. The scheduler uses the longest plan and aligns execution by stage index:
+
+```text
+stage 0: read A0 → read B0 → write A0 → write B0
+stage 1: read A1           → write A1
+stage 2: read A2           → write A2
+```
+
+A task without a given stage, read, or write is skipped at that position. The central constraints remain:
+
+1. Complete every read in a stage first.
+2. Then execute every write in that stage.
+3. Enter the next stage's reads only after the current stage's writes finish.
+
+The batching unit is the stage index, not an individual task. Preserving `read → write` only within each task still interleaves one task's write with the next task's read and loses cross-instance batching.
+
+## Multiple stages express real layout dependencies
+
+A measurement cannot always be reduced to one read and one write. Later geometry may depend on a layout created by an earlier write:
+
+```text
+stage 0 read
+  → stage 0 write: change nodes participating in layout
+  → stage 1 read: read the new layout result
+  → stage 1 write: commit the next state
+```
+
+This write-to-read boundary is an algorithmic dependency and cannot be eliminated completely by reordering. The scheduler moves all tasks across the boundary together instead of letting each task independently force layout resolution.
+
+The number of stages is not the number of reflows. The first read may need to resolve writes left before scheduler execution. If a stage's write does not invalidate style or layout, the next read may reuse the existing result. React commits and code outside the task can also create other Layout events. Stages describe intentionally retained read/write dependency boundaries.
+
+## React writes may require synchronous DOM
+
+A direct DOM write has completed when its function returns. A React external-store update can be batched by React. If the next stage immediately reads newly rendered nodes, an asynchronous commit would leave the read observing old DOM.
+
+A stage that requires synchronous React submission can set `flushSync: true`. If any plan in that stage requires it, the scheduler wraps every write in that stage with a single `flushSync`:
+
+```ts
+flushSync(() => {
+  writeA();
+  writeB();
+  writeC();
+});
+```
+
+This avoids calling `flushSync` separately for every task. When the function returns, React updates from the current writes have committed and the next stage can read the updated DOM.
+
+[`flushSync`](https://react.dev/reference/react-dom/flushSync) is a synchronous React commit boundary, not a browser reflow API. It may synchronously process pending updates or Effects outside its callback, may make Suspense fallbacks reappear, and increases synchronous application work. Mark a write for synchronous commit only when the next stage genuinely depends on DOM generated by React.
+
+The browser usually resolves layout from these DOM changes during a later geometry read. A performance timeline can therefore show React commit and Layout as separate events: `flushSync` guarantees commit ordering, while staged reads and writes reduce layout reads after the commit.
+
+## Stable task identity and batch snapshots
+
+The waiting queue deduplicates by function identity. Repeatedly scheduling the same stable task before the microtask begins preserves one entry. Creating a new closure each time creates distinct tasks and cannot be merged automatically.
+
+At flush start, the scheduler copies and clears the waiting queue. If a task schedules itself from its plan, read, or write, the new request enters the next microtask batch rather than joining the running stages:
+
+```text
+pending batch A
+  → running batch A
+      → schedule(task)
+          → pending batch B
+```
+
+This snapshot keeps stage participants stable within one pass. Otherwise, a task added mid-execution could miss earlier stages or force the scheduler to restart completed reads and writes.
+
+## Cancellation semantics
+
+Cancellation has different effects depending on timing:
+
+- While a task remains in the waiting queue, it is removed without creating a plan.
+- After a task enters a running batch, it is marked canceled and any read or write not yet started is skipped.
+- If a running task is also waiting in the next batch, cancellation removes that pending entry as well.
+
+An individual read or write that has already begun cannot be interrupted. The scheduler can check cancellation and skip later operations only after the JavaScript function returns.
+
+## Cleanup is the transaction's final write
+
+An execution plan may provide `cleanup` to restore temporary DOM, release measurement state, or undo intermediate results that were not committed. Its semantics are:
+
+- It runs after normal completion, mid-execution cancellation, or a read/write failure.
+- It runs at most once for each plan.
+- A plan with no stages still runs cleanup.
+- A cleanup failure does not prevent other tasks from cleaning up.
+
+Cleanup is treated as a write. Normally it runs after every write in the task's final stage. If a task ends early, it runs at the current stage's write boundary. When a task has fewer stages than another, cleanup occurs before the other task's next-stage read, so cleanup DOM changes resolve at a shared write-to-read boundary.
+
+Cleanup must handle a transaction that completed only some stages. It cannot assume that all temporary nodes were created or that final state was committed.
+
+## Error isolation
+
+Plan creation, reads, writes, and cleanup have separate error boundaries. A failed task stops its own later operations and enters cleanup without preventing other tasks in the same batch from continuing.
+
+If plan creation fails, no usable plan exists and therefore no cleanup can run. If a read or write fails, the plan exists; the scheduler skips its later stages and runs cleanup once. A cleanup error is reported without invoking cleanup again.
+
+This isolation preserves the batch structure when one task fails. It does not restore business state; the cleanup implementation still determines which intermediate results can be rolled back.
+
+## Microtasks merge work; they do not yield
+
+When the first waiting task arrives, the scheduler queues one microtask. Tasks generated within the same synchronous process can be collected and executed by that microtask.
+
+A microtask is not a time slice. From plan creation through every stage and cleanup, a batch continues synchronously on the main thread. A large batch or expensive individual task can still become a long task.
+
+Staged scheduling addresses DOM read/write order. [Viewport-Priority Task Scheduling](./viewport-priority-scheduling) addresses when a large amount of pending measurement work receives execution time. They solve different layers of the performance problem.
+
+## Boundaries
+
+- The scheduler relies on tasks to distinguish reads from writes and cannot detect an operation of the other kind inside a callback.
+- A task function should create an execution plan only. Direct layout access during plan creation bypasses stage batching.
+- Browsers may recalculate layout between stages, but actual Layout events depend on work across the whole page.
+- `flushSync` guarantees a React DOM commit; it does not guarantee that the browser has completed style calculation, layout, or paint.
+- A synchronous batch does not yield the main thread and cannot replace frame- or idle-time task slicing.
+- Cancellation cannot interrupt a JavaScript function that has already started.
+- Only stable function identity provides waiting-queue deduplication and next-batch replacement semantics.
+
+The core constraint of layout task batching is simple: complete every read in a stage, then every write, and enter another read stage only when the algorithm genuinely depends on the new layout.

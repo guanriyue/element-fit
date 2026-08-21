@@ -1,0 +1,139 @@
+---
+description: Prioritize layout measurement by distance from the viewport, smoothing main-thread load from many instances while guaranteeing eventual execution.
+outline: true
+pageType: doc
+---
+
+# Viewport-Priority Task Scheduling
+
+An individual measurement task may be brief, but many components can become invalid simultaneously during initial rendering, container resizing, or a style switch. If every instance reads layout immediately, their costs accumulate into continuous main-thread work and prevent the current frame from finishing on time.
+
+Element Fit uses viewport-priority scheduling to divide work into `near` and `far` tasks:
+
+- `near` means the element is inside or close to the viewport. Its task enters a microtask batch and receives a result first.
+- `far` means the element is farther from the viewport. Its task preferably waits for browser idle time and runs in bounded batches.
+
+This is a peak-smoothing strategy. It neither reduces the measurement work each component must eventually complete nor changes the measurement algorithm. It advances work the user is more likely to see and spreads distant work across later execution opportunities.
+
+## Sample an expanded viewport
+
+Priority comes from intersecting an element's `getBoundingClientRect()` with an expanded viewport:
+
+```ts
+const nearViewport =
+  rect.bottom >= -verticalMargin &&
+  rect.top <= window.innerHeight + verticalMargin &&
+  rect.right >= -horizontalMargin &&
+  rect.left <= window.innerWidth + horizontalMargin;
+```
+
+The margin expands the near region beyond the actual viewport. Elements about to enter through scrolling can complete measurement in advance, avoiding visible state delay from a strict viewport boundary.
+
+Vertical and horizontal sampling ranges can be configured separately. The margin is a scheduling heuristic, not part of geometry detection. Adjusting it changes only when a task runs, not its final measurement result.
+
+## Priority is sampled when scheduled
+
+`near` and `far` are not persistent element states. Proximity is sampled once when a task is scheduled. The scheduler does not continuously track visibility with IntersectionObserver and does not automatically update priority on scroll.
+
+If a far element scrolls near the viewport before its task runs, it remains in the far queue unless scheduled again. Far tasks are never paused indefinitely and will complete in a later idle batch. Scheduling the same task again can use the new position sample and move it into the near queue.
+
+Continuous visibility tracking suits work that should not run while offscreen. Element Fit has a different completion condition: every valid measurement must eventually complete, and near/far classification only spreads burst load. Maintaining observation state for every instance would not change that condition.
+
+## Merge near tasks in a microtask
+
+The scheduler stores near tasks in a `Set`. The first near task in the current synchronous process schedules one microtask; other tasks added during that process share the flush:
+
+```text
+schedule A ─┐
+schedule B ─┼─→ one microtask → A, B, C
+schedule C ─┘
+```
+
+At flush start, the scheduler takes a snapshot and removes each task from the Set before running it. If a task schedules itself while executing, it enters the next microtask instead of running recursively in the current loop.
+
+The near queue has no task-count limit. This produces viewport-adjacent state quickly, but many simultaneous near instances can still create a long microtask. Priority scheduling can defer far work; it cannot eliminate the script, style, and layout cost of near tasks themselves.
+
+## Batch far tasks within idle budgets
+
+The far queue prefers `requestIdleCallback`. An idle callback limits work by two conditions:
+
+1. The current batch does not exceed a predefined task-count limit.
+2. After the first task, processing continues only while `timeRemaining() > 1ms`, or when the callback's timeout has expired.
+
+Each callback executes at least one task even when the browser reports `0` remaining time. This guarantees progress instead of repeatedly receiving an empty budget while the page remains busy.
+
+The batch limit controls task count in one execution opportunity, not time. If an individual task is expensive, even a small batch can exceed the time available in one frame.
+
+A finite timeout prevents indefinite starvation while the browser remains busy. After the timeout expires, the scheduler may continue the current batch despite insufficient idle time, but it still respects the task-count limit. The timeout is a starvation fallback, not a completion deadline or fixed delay.
+
+The remaining queue requests another idle callback until every task has completed:
+
+```text
+far tasks
+  → idle batch 1
+  → idle batch 2
+  → …
+  → empty
+```
+
+If `requestIdleCallback` is unavailable, the scheduler falls back to `requestAnimationFrame`, then to a timer if RAF is also unavailable. Fallback paths preserve the task-count limit but cannot use a real idle-time budget.
+
+## Stable task identity enables deduplication and replacement
+
+The Set uses function identity as its key. Repeatedly scheduling the same function reference keeps one queue entry:
+
+```ts
+schedule(measure, 'far');
+schedule(measure, 'far');
+```
+
+The second call does not create duplicate pending work. The task reads the latest nodes, dimensions, and options from its store at execution time, so one execution consumes the newest state accumulated while waiting.
+
+Creating a new closure for each schedule produces different identities and distinct tasks:
+
+```ts
+schedule(() => measure(versionA), 'far');
+schedule(() => measure(versionB), 'far');
+```
+
+This form does not receive automatic replacement semantics. To keep only the latest request, provide a stable task function with current input stored elsewhere, or explicitly cancel the old function before adding the new one.
+
+Stable identity also enables queue migration:
+
+- Scheduling a far task again as `near` first removes it from the far Set and adds it to the near Set.
+- Scheduling a near task again as `far` first removes it from the near Set and adds it to the far Set.
+- `cancel(task)` removes a task from both Sets.
+
+Already scheduled browser microtasks, idle callbacks, and RAF callbacks need not be canceled synchronously. When invoked, they inspect the current Set; if tasks have migrated or been canceled, the flush naturally becomes a no-op.
+
+Cancellation affects only tasks that have not begun. The scheduler does not interrupt a running function. A longer staged measurement still needs its own token, cleanup, or stage-cancellation mechanism to ensure result validity.
+
+## Scheduler responsibility
+
+Viewport-priority scheduling decides only when a task receives an execution opportunity. It does not analyze task contents or automatically merge internal DOM reads, DOM writes, or state commits.
+
+The number of style calculations and layouts after execution begins still depends on the task's read/write order. Near/far classification cannot replace layout batching or repair forced reflow caused by interleaved DOM access.
+
+## Position sampling has a cost
+
+`getBoundingClientRect()` is a layout read. If pending DOM or style writes exist, sampling position can require the browser to update layout synchronously. Viewport-priority scheduling reduces the peak from many later tasks; it does not make this read free.
+
+Position is therefore sampled only when a task needs scheduling. It is not read continuously during scrolling, and no unrelated geometry is read merely to assign priority.
+
+## Error isolation
+
+Each task runs inside an independent `try/catch`. If one task throws, its error is reported through the runtime's error-reporting entry point and other tasks in the same batch continue.
+
+Error isolation only ensures that the queue progresses; it does not retry a failed task automatically. The task remains responsible for cleaning intermediate state and scheduling new work when a later valid signal arrives.
+
+## Boundaries
+
+- Priority scheduling changes work distribution but does not reduce total measurement work.
+- Near tasks are not sliced and can still form a long task when many instances are near.
+- Far execution timing depends on browser load, so the first reliable state can be delayed.
+- A task-count limit cannot replace a real time budget or constrain the duration of one task.
+- Priority is sampled at scheduling time; scrolling alone does not update an already queued task.
+- Position sampling is itself a layout read and should not be interleaved with DOM writes.
+- Only stable function identity provides deduplication, migration, and cancellation semantics.
+
+The goal of viewport-priority scheduling is not to predict exactly which node the user will see next. It divides a burst of work by urgency, completes viewport-adjacent state first, and lets distant tasks continue in bounded batches.

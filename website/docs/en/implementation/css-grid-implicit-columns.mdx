@@ -1,0 +1,130 @@
+---
+description: Distinguish explicit and implicit CSS Grid columns, and constrain implicit track sizes to preserve stable column-count semantics.
+outline: true
+pageType: doc
+---
+
+# CSS Grid Implicit Columns
+
+A CSS Grid does not necessarily contain only the columns declared by `grid-template-columns`. When a grid item is placed beyond the explicit grid, the browser automatically creates implicit tracks. Auto-placement can also extend the grid after all explicit tracks have been used.
+
+This behavior lets CSS accommodate out-of-range content, but it creates a problem for JavaScript column measurement: a value read from `grid-template-columns` may contain both explicit and implicit columns. The number of serialized tracks cannot be treated directly as the number of columns declared by the component.
+
+## Explicit and implicit grids
+
+[`grid-template-columns`](https://drafts.csswg.org/css-grid-2/#track-sizing) defines explicit columns. The following container has two explicit tracks:
+
+```css
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+```
+
+If an item spans beyond the explicit grid boundary, the browser still needs to establish a grid area in which it can be placed:
+
+```css
+.item {
+  grid-column: span 4;
+}
+```
+
+The CSS Grid specification calls these additional rows and columns [implicit tracks](https://drafts.csswg.org/css-grid-2/#implicit-grids). They are not part of the template declaration, but participate in placement and sizing alongside explicit tracks.
+
+Implicit column sizes are controlled by [`grid-auto-columns`](https://drafts.csswg.org/css-grid-2/#propdef-grid-auto-columns). Its initial value is `auto`, so an implicit column can acquire visible width from its content and alter the entire grid layout.
+
+## Resolved values include implicit tracks
+
+`getComputedStyle(element).gridTemplateColumns` does not always return the CSS text written by the author. For an independent grid axis that has generated a grid container box, CSS Grid defines a special resolved value: the browser returns the used values of the tracks and serializes implicit tracks with them.
+
+For example, the authored value might be:
+
+```css
+repeat(2, minmax(12rem, 1fr))
+```
+
+After layout, the returned value may look more like:
+
+```text
+240px 240px 96px 96px
+```
+
+The final two entries may be implicit columns created by an out-of-range item. The specification explicitly states that implicit tracks appear in the serialized results of `grid-template-columns` and `grid-template-rows`, even though authors cannot declare implicit tracks through those properties.
+
+This behavior makes the resolved value useful for reading final track sizes, but it cannot inherently answer how many effective columns the template produced.
+
+## Collapse implicit columns to zero width
+
+If column-count semantics should come only from the explicit template, first constrain every implicit column:
+
+```css
+.grid {
+  grid-auto-columns: 0px;
+}
+```
+
+This does not prevent the browser from creating implicit tracks. Out-of-range placement still exists and grid-line numbers remain unchanged; only the dimensions of those implicit columns change. The resolved track list can therefore become:
+
+```text
+240px 240px 0px 0px
+```
+
+Column counting can then ignore nearly zero-width tracks and retain only tracks that form visible column width.
+
+This approach first constrains the layout result, then recovers semantics from that result. Remembering the template's column count in JavaScript is insufficient because the number of actual explicit columns produced by `auto-fit` still depends on current available space. Counting the resolved track list alone incorrectly includes implicit columns. Zero-width implicit tracks give the two groups a distinguishable geometric feature.
+
+## Filter tracks with a conservative threshold
+
+Strictly comparing a string with `0px` couples the logic to the browser's serialization format. Track dimensions can also be affected by scaling, subpixel layout, and floating-point serialization. Parse numeric values and ignore tracks below a conservative threshold:
+
+```ts
+const isVisibleTrack = (track: string): boolean => {
+  const size = Number.parseFloat(track);
+
+  if (Number.isNaN(size)) {
+    return true;
+  }
+
+  return size >= 1;
+};
+```
+
+The current visible-track threshold is `1 CSS px`. It is not a boundary defined by CSS Grid, but a conservative tolerance for serialization error around zero-width tracks. Tokens that cannot be parsed as numbers are preserved so that unknown syntax does not silently reduce the column count.
+
+Threshold filtering also treats a real explicit track narrower than `1px` as invisible. This approach is intended for ordinary UI column widths, not as a general semantic parser for arbitrary CSS Grid track lists.
+
+## Parse the resolved track list
+
+Browsers ordinarily expand the resolved value of an independent grid axis into a list of tracks with used sizes. In controlled cases, the list can be split on spaces and visible sizes counted:
+
+```ts
+const columnCount = gridTemplateColumns
+  .trim()
+  .split(' ')
+  .filter((track) => track.length > 0 && isVisibleTrack(track))
+  .length;
+```
+
+Two basic results also require handling:
+
+- `none` means the template establishes no tracks.
+- Some incomplete layout environments may preserve `repeat(<fixed-count>, ...)`, whose fixed repetition count can be read directly.
+
+This lightweight parser depends on controlled template syntax. Track lists containing line names, subgrid, complex custom serialization, or nested whitespace cannot be safely parsed with ordinary string splitting. Browsers provide no stable API that returns structured Grid track objects. Supporting arbitrary authored CSS requires tighter syntax constraints or a dedicated CSS parser.
+
+## Reading requires layout
+
+The required information is the used track size, not the declared value. The browser must complete Grid item placement and track sizing before it knows how many columns `auto-fit` produced, the final width of each column, and whether implicit tracks were created.
+
+Reading `gridTemplateColumns` can therefore require style and layout resolution. Treat it as a layout read and avoid interleaving it with per-instance DOM writes. Batch scenarios can place it in a shared read stage; see [Staged Layout Task Batching](./layout-task-scheduling).
+
+## Boundaries
+
+- `grid-auto-columns: 0px` only collapses implicit column sizes. It does not prevent implicit tracks, grid lines, or out-of-range placement from being created.
+- Column gaps, an item's own overflowing content, and explicit placement may still have visual effects; a zero-width track does not mean the out-of-range layout no longer exists.
+- A resolved track list can contain line names or platform-specific serialization differences. Simple string splitting is suitable only for controlled templates.
+- The small-size threshold ignores real but extremely narrow explicit columns.
+- `display: none`, a node that has not formed a grid container box, and subgrid produce different resolved-value semantics.
+- Reading used track sizes is a layout read, not pure string-property access.
+
+The core idea is not to derive the column count from CSS source text. Let the browser complete the real Grid layout first, then distinguish template columns from fallback layout columns through zero-width implicit tracks.
