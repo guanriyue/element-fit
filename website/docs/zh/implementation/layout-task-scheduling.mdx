@@ -1,0 +1,165 @@
+---
+description: 将多个布局事务组织成全局 read/write 阶段，减少交错 DOM 读写产生的同步布局，并协调 React 同步提交。
+outline: true
+pageType: doc
+---
+
+# 布局任务的分阶段批处理
+
+浏览器可以延迟处理 DOM 和样式写入，直到绘制前统一更新布局。如果代码在一次同步执行过程中反复写入 DOM，又立即读取依赖布局的几何信息，浏览器必须提前结算尚未完成的样式和布局工作。
+
+多个独立任务按照实例顺序执行时，容易形成下面的调用序列：
+
+```text
+read A → write A → read B → write B → read C → write C
+```
+
+每个 write 后面的布局读取都可能触发一次 forced reflow。Element Fit 将同一批任务组织成全局 read/write 阶段：
+
+```text
+read A → read B → read C → write A → write B → write C
+```
+
+这种顺序减少了读写之间的切换次数，使多个任务可以共享浏览器已经完成的布局结果。它降低的是同步布局发生的机会，不保证浏览器只产生固定次数的 Layout；React 提交、样式失效、不同文档和任务之外的代码仍然可能引入额外布局。
+
+## 任务在执行时创建计划
+
+布局任务是一个稳定的函数。调度器真正开始处理任务时调用它，并取得本次执行计划：
+
+```ts
+type LayoutTask = () => LayoutTaskPlan | undefined;
+
+type LayoutTaskPlan = {
+  stages: readonly LayoutTaskStage[];
+  cleanup?: () => void;
+};
+
+type LayoutTaskStage = {
+  read?: () => void;
+  write?: () => void;
+  flushSync?: boolean;
+};
+```
+
+任务函数在队列 flush 时才运行，可以读取最新的节点、配置和缓存，而不需要在调度时把状态封装进新的闭包。返回 `undefined` 表示当前条件下已经不需要执行。
+
+调度器会先为当前批次中的所有任务创建计划，再开始任何 stage。计划由此固定为本批次的执行快照；执行过程中出现的新请求不会修改已经开始的阶段。
+
+## 按 stage 对齐全部任务
+
+不同任务可以返回不同数量的 stage。调度器取最长计划的 stage 数量，并按照相同索引对齐执行：
+
+```text
+stage 0: read A0 → read B0 → write A0 → write B0
+stage 1: read A1           → write A1
+stage 2: read A2           → write A2
+```
+
+缺少某个 stage、read 或 write 的任务会在对应位置跳过。关键约束始终不变：
+
+1. 一个 stage 内的全部 read 先完成。
+2. 随后执行同一 stage 的全部 write。
+3. 当前 stage 的写入完成后，才进入下一个 stage 的 read。
+
+批处理的单位不是单个任务，而是 stage 索引。只在每个任务内部遵守 `read → write`，仍然会让前一个任务的 write 与后一个任务的 read 交错，无法获得跨实例批处理的效果。
+
+## 多个 stage 表达真实布局依赖
+
+一次测量并不总能压缩为一个 read 和一个 write。后续几何结果可能依赖前一阶段写入形成的新布局：
+
+```text
+stage 0 read
+  → stage 0 write：改变参与布局的节点
+  → stage 1 read：读取新的布局结果
+  → stage 1 write：提交下一状态
+```
+
+这种 write → read 边界是算法本身的依赖，不能通过重新排列彻底消除。调度器的作用是让所有任务在同一个边界上共同前进，而不是让每个任务各自触发布局结算。
+
+stage 数量也不等于 reflow 次数。第一个 read 可能需要结算调度器执行前遗留的写入；某个 stage 的 write 如果没有使样式或布局失效，下一次 read 也可能直接复用现有结果；React commit 和任务之外的代码还可能产生其他 Layout 事件。stage 只表达有意保留的读写依赖边界。
+
+## React 写入需要同步形成 DOM
+
+普通 DOM write 在函数返回前已经完成。React 外部 Store 更新则可能被 React 批处理；如果下一 stage 立即读取新渲染的节点，异步提交会让 read 看到旧 DOM。
+
+需要同步 React 提交的 stage 可以设置 `flushSync: true`。同一 stage 中只要有一个计划需要同步提交，调度器就用一次 `flushSync` 包裹该 stage 的全部 write：
+
+```ts
+flushSync(() => {
+  writeA();
+  writeB();
+  writeC();
+});
+```
+
+这样不会为每个任务分别调用 `flushSync`。函数返回时，当前 write 产生的 React 更新已经提交，下一 stage 可以读取更新后的 DOM。
+
+[`flushSync`](https://react.dev/reference/react-dom/flushSync) 是 React 的同步提交边界，不是浏览器的 reflow API。它可能同步处理 callback 之外的 pending updates 或 Effect，也可能使 Suspense fallback 重新出现，并会增加应用的同步工作。只有下一阶段确实依赖 React 生成的新 DOM 时，才需要把 write 标记为同步提交。
+
+浏览器通常在后续布局读取时才结算这次 DOM 变化。因此性能时间轴上可以看到 React commit 与 Layout 分开出现：`flushSync` 保证提交时序，read/write 分阶段负责减少提交之后的布局读取次数。
+
+## 稳定任务身份与批次快照
+
+等待队列使用函数身份去重。同一个稳定任务在微任务开始前重复调度，只保留一项。每次创建新的闭包则会形成不同任务，无法获得自动合并。
+
+flush 开始时，调度器会复制并清空等待队列。任务在自己的 plan、read 或 write 中再次安排自身时，新请求进入下一次微任务批次，不会插入正在运行的 stage：
+
+```text
+pending batch A
+  → running batch A
+      → schedule(task)
+          → pending batch B
+```
+
+批次快照保证同一轮中每个 stage 的参与者保持稳定。否则执行到一半加入的新任务可能错过早期 stage，或者迫使调度器重新开始已经完成的 read/write 顺序。
+
+## 取消语义
+
+取消发生在不同阶段时具有不同结果：
+
+- 任务仍在等待队列时，直接移除，不创建执行计划。
+- 任务已经进入运行批次时，标记为 cancelled，跳过尚未开始的 read 和 write。
+- 运行中的任务同时又排入下一批时，取消也会移除下一批的待执行项。
+
+已经开始执行的单个 read 或 write 不会被中断。JavaScript 函数执行完成后，调度器才能检查取消状态并跳过后续操作。
+
+## cleanup 是事务的最终写入
+
+执行计划可以提供 `cleanup`，用于恢复临时 DOM、释放测量状态或撤销没有提交的中间结果。它具有以下语义：
+
+- 正常完成、运行中取消或 read/write 失败后都会执行。
+- 每个计划最多执行一次。
+- 没有任何 stage 的计划也会执行 cleanup。
+- cleanup 自身失败不会阻止其他任务继续清理。
+
+cleanup 被视为写操作。正常情况下，它在任务最后一个 stage 的全部 write 完成后执行；任务提前结束时，则在当前 stage 的 write 边界后执行。任务的 stage 数量较少时，cleanup 会发生在其他任务下一 stage 的 read 之前，因此清理产生的 DOM 变化可以在统一的 write → read 边界上结算。
+
+cleanup 必须能够处理只完成部分阶段的事务。它不能假设所有临时节点都已创建，也不能假设最终状态已经提交。
+
+## 错误隔离
+
+计划创建、read、write 和 cleanup 分别具有错误边界。一项任务失败时会停止自己的后续操作并进入 cleanup，但不会阻止同一批次中的其他任务继续执行。
+
+计划创建失败时还没有可用的计划，因此没有 cleanup 可以调用。read 或 write 失败时，计划已经存在，调度器会跳过该任务后面的阶段并执行一次 cleanup。cleanup 抛出的错误会被报告，但不会再次调用 cleanup。
+
+这种隔离保证批次结构不会因为单项任务失败而中断。它不负责恢复业务状态；事务能够回滚哪些中间结果，仍由 cleanup 的实现决定。
+
+## 微任务只负责合并，不负责让出主线程
+
+第一次加入等待任务时，调度器安排一个 microtask。同一同步过程内产生的任务可以由这一轮 microtask 统一取得并执行。
+
+microtask 不是时间切片。一个批次从计划创建到全部 stage 和 cleanup 完成，会在同一段同步执行中持续占用主线程。大量任务或单项任务过重时，仍然可能形成长任务。
+
+分阶段调度解决的是 DOM 读写顺序；[视窗优先级任务调度](./viewport-priority-scheduling)解决的是大量待测量工作何时获得执行机会。两者处理不同层次的性能问题。
+
+## 能力边界
+
+- 调度器依赖任务正确区分 read 和 write，不会检查函数内部是否混入了另一类操作。
+- 任务函数只应创建执行计划；在计划创建过程中直接读取或写入布局会绕过 stage 批处理。
+- stage 之间允许浏览器重新计算布局，但实际 Layout 次数由浏览器和整个页面的工作共同决定。
+- `flushSync` 保证 React DOM 提交，不保证浏览器已经完成样式计算、布局或绘制。
+- 同步批次不会主动让出主线程，不能代替基于帧或空闲时间的任务分片。
+- 取消无法中断已经开始的 JavaScript 函数。
+- 只有稳定的函数身份才能获得等待去重和下一批替换语义。
+
+布局任务批处理的核心约束可以概括为：同一阶段先完成全部读取，再完成全部写入；只有算法确实依赖新布局时，才进入下一阶段读取。

@@ -6,6 +6,11 @@
   },
   {
     "type": "file",
+    "name": "layout-task-scheduling",
+    "label": "布局任务的分阶段批处理"
+  },
+  {
+    "type": "file",
     "name": "range-geometry",
     "label": "Range 几何测量"
   },
