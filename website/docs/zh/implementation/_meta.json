@@ -13,5 +13,10 @@
     "type": "file",
     "name": "style-observation",
     "label": "样式变化的观测与失效"
+  },
+  {
+    "type": "file",
+    "name": "viewport-priority-scheduling",
+    "label": "视窗优先级任务调度"
   }
 ]
