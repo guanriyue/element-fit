@@ -6,7 +6,7 @@
   },
   {
     "type": "file",
-    "name": "inline-overflow",
-    "label": "InlineOverflow"
+    "name": "range-geometry",
+    "label": "Range 几何测量"
   }
 ]

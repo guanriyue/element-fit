@@ -1,0 +1,159 @@
+---
+description: 使用 Range 读取已渲染 DOM 内容的亚像素宽度与布局片段，规避浏览器尺寸 API 的精度缺口。
+outline: true
+pageType: doc
+---
+
+# Range 与浏览器几何测量
+
+浏览器负责完成字体选择、文本塑形、inline 排版、换行和 ellipsis 绘制，但暴露给 JavaScript 的布局信息是有限的。元素尺寸可以描述盒模型和滚动区域，却不能直接回答“省略号是否已经出现”或“选中内容形成了几行”。
+
+Range 通常用于文本选区和编辑器，也可以读取已经参与布局的 DOM 内容。Element Fit 使用 Range 提供的两种几何结果：
+
+- `getBoundingClientRect()`：取得全部选中片段的包围矩形。
+- `getClientRects()`：保留选中内容形成的多个布局片段。
+
+Range 不构造新的布局，也不是任意 DOM 子树的尺寸计算器。它让组件能够继续利用浏览器已经完成的真实排版，并补充普通元素尺寸没有暴露的信息。
+
+## 浏览器提供的有限尺寸
+
+常见的溢出判断会比较：
+
+```ts
+element.scrollWidth > element.clientWidth
+```
+
+[`scrollWidth` 和 `clientWidth`](https://drafts.csswg.org/cssom-view/#extensions-to-the-element-interface) 在 CSSOM View 中以 Web IDL `long` 暴露，JavaScript 读取到的是整数。浏览器内部的文本布局仍然可以落在亚像素边界，因此两个整数相等并不总能证明内容完整可见。
+
+元素自身的 `getBoundingClientRect()` 也不能替代内容测量。它描述元素生成的 border box，不会直接返回被裁切内容在省略前所需的宽度。
+
+浏览器目前没有通用的 ellipsis 状态查询，也没有一个能够在任意 DOM 子树尚未参与布局时直接计算最终 CSS 尺寸的接口。测量逻辑需要根据目标问题组合现有的尺寸信息。
+
+## Range 的几何结果
+
+Range 使用 DOM 边界描述一段选中内容：
+
+```ts
+const range = document.createRange();
+
+range.selectNodeContents(content);
+```
+
+[`Range.getClientRects()` 和 `Range.getBoundingClientRect()`](https://drafts.csswg.org/cssom-view/#extensions-to-the-range-interface) 由 CSSOM View 定义。选区中的文本片段和被选中的顶层元素盒会形成一组 `DOMRect`：
+
+- `getClientRects()` 返回这组布局片段。
+- `getBoundingClientRect()` 返回能够包围全部非空片段的最小矩形。
+
+`DOMRect` 的坐标和尺寸可以包含小数，使 Range 能够保留整数 `scrollWidth` 和 `clientWidth` 没有表达的亚像素信息。
+
+## 单行内容的临界精度校正
+
+直接对所有内容使用 Range 没有必要。单行溢出判断可以先计算整数尺寸差值：
+
+```ts
+const difference = content.scrollWidth - availableContentWidth;
+```
+
+当前实现使用 `1 CSS px` 作为保守的低置信度区间：
+
+| 初步差值 | 处理 |
+| --- | --- |
+| `difference >= 1` | 判定为溢出 |
+| `difference <= -1` | 判定为未溢出 |
+| `-1 < difference < 1` | 使用 Range 继续测量 |
+
+`1px` 不表示浏览器误差固定为 `1px`。`0.5px` 或 `0.2px` 在部分浏览器平台上也可能足够；当前值选择了更保守的校正范围。
+
+在常见的单行裁剪布局中，未溢出时 `scrollWidth` 经常刚好等于可用宽度。相等只表示整数尺寸一致，仍然属于低置信度结果。此时可以继续读取选中内容的小数宽度：
+
+```ts
+const range = content.ownerDocument.createRange();
+
+range.selectNodeContents(content);
+
+const overflow =
+  range.getBoundingClientRect().width > availableContentWidth;
+```
+
+Range API 是规避这类浏览器尺寸 Bug 的一种解决方案。它不改变浏览器的整数取整行为，而是绕过只依赖 `scrollWidth` 和 `clientWidth` 的判定路径。
+
+## 平台问题与社区讨论
+
+整数尺寸造成的临界漏判已经出现在 CSS 标准讨论、浏览器问题跟踪和社区实践中：
+
+- [CSSWG issue #4123](https://github.com/w3c/csswg-drafts/issues/4123) 讨论 ellipsis 已经出现，但 `scrollWidth`、`clientWidth` 或其他几何结果因取整而保持相等的情况。
+- [Chromium issue 41468858](https://issues.chromium.org/issues/41468858) 是对应的 Chromium 问题跟踪项。
+- [Mozilla bug 1250824](https://bugzilla.mozilla.org/show_bug.cgi?id=1250824) 记录了 `overflow: hidden` 与 `text-overflow: ellipsis` 场景中的 `scrollWidth` 取整问题。
+- [Stack Overflow：Wrong ellipsis detection with scrollWidth](https://stackoverflow.com/questions/71440290/wrong-elipsis-detection-with-scrollwidth-when-text-length-is-close-to-width) 展示了临界宽度下的社区复现和通过临时 DOM 副本测量的替代方案。
+
+Range 校正不代表这些平台问题已经被修复，也不能消除所有浏览器差异。它是在目标内容已经完成布局的前提下，使用另一类浏览器几何信息降低临界漏判。
+
+## 比较相同的盒模型
+
+Range 返回选中内容的几何，比较对象也必须表达内容实际可以使用的空间。
+
+当外层容器提供可用宽度时，应使用容器的 content box width：
+
+```ts
+const availableContentWidth =
+  root.clientWidth - paddingInlineStart - paddingInlineEnd;
+```
+
+当内容和容器是同一个元素时，整数初步判断可以直接比较采用 padding box 语义的 `scrollWidth` 和 `clientWidth`。进入 Range 校正后，再将可用宽度转换为 content box width。
+
+如果直接把 Range width 与 border box width 比较，padding 和 border 会被错误地计入可用空间。Range 提供更细的几何精度，并不会自动修正比较双方的盒模型语义。
+
+## 使用布局片段重建行信息
+
+`getBoundingClientRect()` 会把全部片段合并成一个包围矩形，因此适合读取普通单行内容的整体宽度。多行内容需要保留每个片段的位置：
+
+```ts
+const rects = Array.from(range.getClientRects());
+```
+
+一条视觉行可能包含文本、链接、`inline-block` 和其他节点产生的多个 rect，不能简单地把 rect 数量作为行数。当前行测量会按照 block 方向的重叠关系合并片段：
+
+1. 忽略宽高同时为 `0` 的 rect。
+2. 查找与当前 rect 在纵向重叠超过 `0.5 CSS px` 的已有行。
+3. 命中时把 rect 作为新的 inline interval 加入该行。
+4. 未命中时建立新行。
+5. 最后按照行的 `top` 排序。
+
+同一行中的 inline interval 还需要先排序并合并重叠范围，才能得到这一行实际占用的横向宽度。这个过程保留了混合 inline 内容产生的多个布局片段，也避免把同一视觉行误算成多行。
+
+## 软换行与强制换行
+
+两个相邻行的 rect 无法单独说明换行原因：
+
+- **软换行**由可用宽度不足产生，空间恢复后可以重新合并。
+- **强制换行**由 `<br />` 或其他内容规则产生，即使两行宽度之和可以放下，也不应重新合并。
+
+当测量逻辑需要区分这两种情况时，可以为 `<br />` 前后分别建立 Range，再判断它们是否对应目标相邻行。当前实现只把 `<br />` 识别为明确的 hard line break；保留换行符、生成内容、block-level box 或其他 CSS 规则形成的强制换行不在同一识别范围内。
+
+## 与 DOM 镜像的区别
+
+Range 读取当前 DOM 已经形成的布局，不会为了测量而克隆、挂载和移除临时节点。这适合观察当前内容的宽度、片段和行信息，也避免了临时 DOM 带来的额外渲染状态。
+
+Range 无法回答反事实布局问题。例如当前 Suffix 已经影响正文换行，而测量目标是“不存在 Suffix 时正文会形成几行”，仅靠现有 Range rect 无法直接得到答案。这类场景需要利用当前片段推导原始结果，或者建立独立的 DOM 镜像重新排版。
+
+读取 Range 几何仍然可能要求浏览器同步更新布局。大量实例应把几何读取放在明确的 read 阶段，并避免与 DOM 写入交错执行。
+
+## 能力边界
+
+Range 几何建立在当前已渲染内容上：
+
+- `display: none`、尚未连接到文档或没有形成布局盒的内容无法得到目标尺寸。
+- Range 选择的是 DOM 内容，伪元素不属于可选取的节点。
+- margin 不属于被选中元素的 border area。
+- 定位和 transform 可能让视觉范围与内容尺寸产生不同语义。
+- 多行内容的 bounding rect 是所有片段的包围范围，不等于内容的单行固有宽度。
+- bidi、ruby、atomic inline-level 元素和纵向书写模式可能产生更复杂的 rect。
+
+Range 几何本身也可能存在浏览器差异。例如 WebKit 的 [issue #296765](https://bugs.webkit.org/show_bug.cgi?id=296765) 记录了换行文本的 `getClientRects()` 和 `getBoundingClientRect()` 结果问题。Range 是利用浏览器有限布局能力的一种测量手段，不是跨浏览器的绝对尺寸来源。
+
+## 应用位置
+
+- [InlineOverflow](../guide/inline-overflow) 在整数尺寸处于低置信度区间时，使用 `getBoundingClientRect()` 校正单行 overflow。
+- [LineClamp](../guide/line-clamp) 使用 `getClientRects()` 取得正文片段，并按照纵向重叠关系重建可见行。
+- [InlineOverflow 实验室](../lab/inline-overflow) 可以观察整数尺寸与 Range width 在临界位置的差异。
+- [LineClamp 实验室](../lab/line-clamp) 可以观察大量多行内容的 Range 测量表现。

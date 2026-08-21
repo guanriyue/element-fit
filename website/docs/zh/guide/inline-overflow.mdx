@@ -42,7 +42,7 @@ InlineOverflow 首先使用 `scrollWidth` 和可用宽度进行初步判断。�
 
 当差值进入 `1 CSS px` 的保守临界区间时，组件会使用 `Range.getBoundingClientRect()` 读取保留小数的内容几何，并完成第二级判断。整数尺寸始终作为第一级判断，Range 只负责校正它无法区分的临界结果。
 
-Range API 是组件规避浏览器尺寸 Bug 的一种解决方案。它读取的是已渲染内容的几何包围盒，而不是浏览器的 ellipsis 状态。该机制适用于普通单行文本和一部分混合 inline 内容；margin、伪元素、定位、transform 和多行排版不属于稳定的测量范围。完整的判断过程、相关社区问题与盒模型处理见 [InlineOverflow 的溢出测量](../implementation/inline-overflow)。
+Range API 是组件规避浏览器尺寸 Bug 的一种解决方案。它读取的是已渲染内容的几何包围盒，而不是浏览器的 ellipsis 状态。该机制适用于普通单行文本和一部分混合 inline 内容；margin、伪元素、定位、transform 和多行排版不属于稳定的测量范围。完整的判断过程、相关社区问题与盒模型处理见 [Range 与浏览器几何测量](../implementation/range-geometry)。
 
 ### Ellipsis 边界校正
 
@@ -219,6 +219,6 @@ MutationObserver 不观察 attributes。只修改 class、style、继承样式�
 
 ## 相关内容
 
-- [InlineOverflow 的溢出测量](../implementation/inline-overflow)：整数尺寸、Range 临界校正与盒模型处理。
+- [Range 与浏览器几何测量](../implementation/range-geometry)：整数尺寸、Range 临界校正与布局片段。
 - [InlineOverflow 实验室](../lab/inline-overflow)：观察临界宽度和大量实例下的测量结果。
 - [LineClamp](./line-clamp)：判断多行内容是否超过指定行数。
