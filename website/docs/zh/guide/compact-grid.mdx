@@ -1,27 +1,227 @@
 ---
-description: CompactGrid 会在空间紧凑时把额外内容移动到声明的插槽位置。
+description: CompactGrid 在自适应 Grid 填满当前行时，把额外内容移动到最后一个有效插槽。
 outline: true
 pageType: doc
 ---
 
 # CompactGrid
 
-`CompactGrid` 使用和 `FitGrid` 相同的自适应网格逻辑，但额外提供了 `Extra` 和 `ExtraSlot`。
+`CompactGrid` 使用和 [FitGrid](./fit-grid) 相同的自适应 Grid 布局，并额外提供 `Extra` 和 `ExtraSlot`，用于处理额外内容单独掉到新一行的问题。
 
-当默认布局还有空间时，`Extra` 会作为独立网格项渲染；当普通网格项刚好填满当前行时，`Extra` 会移动到最后一个普通网格项中的 `ExtraSlot`，避免额外内容单独掉到新的一行。
+非紧凑状态下，`Extra` 是 Root 下的一个独立 Grid Item。当普通 Item 刚好填满当前行、Extra 将独占下一行时，组件进入紧凑状态，把 Extra 的 children 渲染到最后一个有效的 `ExtraSlot` 中。
 
-下面的示例把“重置”按钮作为额外操作。宽度充足时它占据独立列；空间紧凑时它会收进“状态”筛选项右侧。可以调整容器宽度、最小 Item 宽度、列数限制和间距，直接观察这些属性对布局与紧凑状态的影响。
+## 适用场景
+
+CompactGrid 适合查询表单、筛选区和设置面板等场景：主体字段根据容器宽度自动换列，重置、帮助或次要操作在空间合适时占据独立单元格，否则收进最后一个字段内部。
+
+它尤其适合以下情况：
+
+- 主体内容继续使用统一最小列宽的 Grid 布局。
+- 只有一组额外内容需要在默认位置和紧凑位置之间切换。
+- 业务会条件渲染尾部字段，希望额外内容回退到当前最后一个有效插槽。
+- 可以接受 Extra 的 children 在位置切换时重新挂载。
+
+如果只需要 CSS 自动换列，不需要移动额外内容，应优先使用 FitGrid。如果额外内容必须保留内部状态、焦点或未受控表单值，应由业务使用一个稳定节点设计专用布局。
+
+## 导入
+
+```tsx
+import { CompactGrid } from '@guanriyue/react-fit/compact-grid';
+```
+
+## 基础用法
+
+下面的示例把“重置”按钮声明为 Extra。宽度允许它留在当前行时，它占据独立 Grid 单元格；普通 Item 填满最后一行时，它会进入“状态”或“金额区间”字段中的最后一个有效 ExtraSlot。
+
+可以调整容器宽度、最小 Item 宽度、列数限制和间距，也可以条件渲染字段、Extra 和多个候选 Slot。
 
 ```tsx file="<root>/src/demos/compact-grid/filter-actions.tsx" preview
 
 ```
 
+## 组合结构
+
+```tsx
+<CompactGrid minItemWidth="14rem" maxColumns={3}>
+  <CompactGrid.Item>
+    <Field name="keyword" />
+  </CompactGrid.Item>
+
+  <CompactGrid.Item>
+    <Field name="status" />
+    <CompactGrid.ExtraSlot />
+  </CompactGrid.Item>
+
+  <CompactGrid.Extra>
+    <button type="reset">重置</button>
+  </CompactGrid.Extra>
+</CompactGrid>
+```
+
+- `Item` 声明一个参与紧凑计算的 Grid Item，并可以提供 `colSpan`。
+- `Extra` 声明额外内容的默认 Grid 位置。一个 Root 只支持一个 Extra。
+- `ExtraSlot` 声明 Extra 在紧凑状态下的候选位置，可以存在多个。
+
+Item 和 Extra 应是 Root 的同级直接子节点。ExtraSlot 应放在某个直接 Item 内部；它可以位于该 Item 后代结构中的任意位置。
+
+## 紧凑条件
+
+CompactGrid 同时满足以下条件时进入紧凑状态：
+
+1. Extra 的 children 不是 `null`、`undefined` 或 `false`。
+2. Root 内至少存在一个 ExtraSlot。
+3. DOM 顺序中的最后一个 ExtraSlot 位于最后一个有效 Item 内部。
+4. 按每个 Item 的跨度计算后，最后一个有效 Item 刚好填满当前行。
+
+最后一个条件意味着 Extra 如果继续作为独立 Grid Item 渲染，就会从下一行开始。组件此时让 Extra 自身返回 `null`，并把它的 children 渲染到 active ExtraSlot 中。
+
+多个 ExtraSlot 同时存在时，DOM 顺序中的最后一个 Slot 是 active Slot。条件渲染靠后的字段后，active Slot 会自动回退到仍然存在的前一个候选位置。非紧凑状态和非 active Slot 都通过原生 `hidden` 属性隐藏。
+
+## Extra 的位置切换
+
+CompactGrid 移动的是 `Extra.children`，不是 Extra 默认渲染的包装元素。传给 `CompactGrid.Extra` 的 `className`、`style` 和其他 DOM props 只属于非紧凑状态下的默认 `div`；紧凑状态下使用的是 ExtraSlot 的元素和 props。
+
+需要在两种位置保留相同包装样式时，应把包装元素放进 children：
+
+```tsx
+<CompactGrid.Extra>
+  <div className="actions">
+    <button type="reset">重置</button>
+  </div>
+</CompactGrid.Extra>
+```
+
+Extra 在默认位置和 ExtraSlot 之间切换时，children 会卸载并在另一个 React 位置重新挂载。它的组件状态、未受控表单状态和当前焦点不会保留。
+
 ## 跨列 Item
 
-`CompactGrid.Item` 可以通过 `colSpan` 声明当前项需要跨越的列数。传入数字时会跨指定列数，传入 `'full'` 时会占满整行。
+`CompactGrid.Item` 可以通过 `colSpan` 声明当前项占据的列数。传入正整数时跨指定列数，传入 `'full'` 时占满整行。
 
-下面的示例中，“联系地址”的 `colSpan` 可以在 `1`、`2`、`3` 和 `'full'` 之间切换，“备注”固定占满整行。配合容器宽度控制，可以观察数字跨列超过当前显式列数时如何退化为整行。带虚线边框的区域用于观察跨列范围。
+数字跨度大于当前显式列数时，CompactGrid 会把它收敛为整行。例如当前只有一列时，`colSpan={2}` 等价于 `colSpan="full"`，不会让越界跨度创建可见的隐式列。
+
+下面的示例可以调整“联系地址”的 `colSpan`，并条件渲染普通 Item、整行 Item、Extra 和 Slot：
 
 ```tsx file="<root>/src/demos/compact-grid/col-span.tsx" preview
 
 ```
+
+普通元素也可以直接作为 Root 的子节点，并按 `span: 1` 参与紧凑计算。组件不会读取普通元素自行设置的 `grid-column`；需要让视觉跨度和内部计算保持一致时，应使用 `CompactGrid.Item`。
+
+## 布局与样式
+
+Root 使用与 FitGrid 相同的 `repeat(auto-fit, minmax(..., 1fr))` 列布局。`minItemWidth`、`minColumns`、`maxColumns`、`colGap` 和 `rowGap` 的列宽语义与 FitGrid 一致。
+
+Root 会以内联样式设置以下必要属性：
+
+- `display: grid`
+- `grid-template-columns`
+- `grid-auto-columns: 0px`
+- `column-gap`
+- `row-gap`
+
+这些属性会覆盖调用方通过 `style` 传入的同名属性，其他行内样式正常保留。`grid-auto-columns: 0px` 用于避免越界数字跨度创建可见隐式列，并保证当前显式列数的判断稳定。
+
+数字形式的长度按像素处理；字符串会作为 CSS 长度直接使用。`minColumns` 和 `maxColumns` 只接受正整数，非法值会被忽略并在开发环境给出警告。
+
+## 状态与重新测量
+
+CompactGrid 使用 ResizeObserver 观察 Root，并从 computed `grid-template-columns` 读取当前显式列数。Root 尺寸变化后，组件会重新判断 active Slot 和紧凑条件。
+
+以下结构变化也会安排重新计算：
+
+- CompactGrid.Item 挂载、卸载或 `colSpan` 变化。
+- ExtraSlot 挂载、卸载或最终 DOM 元素替换。
+- Extra 挂载、卸载或 children 引用变化。
+
+组件不使用 MutationObserver 观察 Root 的普通子节点。只添加、删除或移动未使用 `CompactGrid.Item` 注册的普通元素时，如果 Root 自身尺寸没有变化，不保证立即重新判断紧凑状态。需要动态调整列表结构时，推荐使用 CompactGrid.Item 声明参与计算的节点。
+
+首次布局测量完成前，Extra 出现在默认 Grid 位置，ExtraSlot 处于 hidden 状态。组件得到列数和布局结构后，如果满足紧凑条件，Extra 的 children 会移动到 active Slot。
+
+## API 参考
+
+### Root
+
+提供自适应 Grid 和紧凑状态上下文，默认渲染为 `div`。
+
+**默认元素：** `div`  
+**Ref：** `HTMLDivElement`  
+**支持 `asChild`：** 是
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `minItemWidth` | `number \| string` | 必填 | 每个 Grid Item 在减少列数前通常应保持的最小宽度；数字按 px 处理。 |
+| `minColumns` | `number` | `undefined` | 尝试保留的最小列数，只接受正整数。 |
+| `maxColumns` | `number` | `undefined` | 当前 Grid 最多创建的列数，只接受正整数。 |
+| `colGap` | `number \| string` | `0` | 列间距；数字按 px 处理。 |
+| `rowGap` | `number \| string` | `colGap` | 行间距；数字按 px 处理。 |
+| `asChild` | `boolean` | `false` | 将 Root 的 props、ref 和必要样式合并到唯一 child。 |
+
+除上述属性外，Root 支持 `div` 的原生属性。
+
+### Item
+
+声明一个参与紧凑计算的 Grid Item，默认渲染为 `div`。
+
+**默认元素：** `div`  
+**Ref：** `HTMLDivElement`  
+**支持 `asChild`：** 是
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `colSpan` | `number \| 'full'` | `undefined` | 当前 Item 占据的列数；越过当前显式列数时按整行处理。 |
+| `asChild` | `boolean` | `false` | 将 Item 的 props、ref、注册行为和跨列样式合并到唯一 child。 |
+
+除上述属性外，Item 支持 `div` 的原生属性。有效 `colSpan` 生成的 `grid-column` 会覆盖调用方通过 `style` 传入的同名属性。
+
+### Extra
+
+声明额外内容及其默认 Grid 位置，默认渲染为 `div`。进入紧凑状态后，Extra 自身返回 `null`。
+
+**默认元素：** `div`  
+**Ref：** `HTMLDivElement`  
+**支持 `asChild`：** 是
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `children` | `ReactNode` | `undefined` | 需要在默认位置和 active ExtraSlot 之间切换的内容。 |
+| `asChild` | `boolean` | `false` | 非紧凑状态下，将 Extra 的 props 和 ref 合并到唯一 child。 |
+
+除上述属性外，Extra 支持 `div` 的原生属性。`null`、`undefined` 和 `false` children 会被视为没有 Extra，组件不会进入紧凑状态。
+
+### ExtraSlot
+
+声明 Extra 在紧凑状态下的候选位置，默认渲染为 `span`。ExtraSlot 自身始终保持挂载，非 active 状态使用 `hidden` 隐藏。
+
+**默认元素：** `span`  
+**Ref：** `HTMLSpanElement`  
+**支持 `asChild`：** 是
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `hidden` | `boolean` | `false` | 强制隐藏当前 Slot；不能用来强制显示非 active Slot。 |
+| `asChild` | `boolean` | `false` | 将 Slot 的 props、ref、hidden 状态和注册行为合并到唯一 child。 |
+
+ExtraSlot 的内容由 active Extra 提供，调用方不应向 ExtraSlot 传入 children。除上述属性外，ExtraSlot 支持 `span` 的原生属性。
+
+## 边界
+
+- Root 的普通布局子节点必须是元素；不要直接放置文本节点。
+- CompactGrid 只支持一个 Extra。多个 Extra 会竞争同一份内部内容状态，结果不受支持。
+- Item 和 Extra 应作为 Root 的同级直接子节点，不应彼此嵌套；Item 也不应嵌套另一个 Item。
+- active ExtraSlot 必须位于最后一个有效 Item 内部，否则不会进入紧凑状态。
+- 普通元素始终按一列计算；组件不读取它们自行声明的跨列样式。
+- Extra 的包装元素不会移动，children 在切换位置时会重新挂载。
+- CSS `order` 或其他视觉重排不会改变 Item 和 ExtraSlot 的 DOM 顺序语义。
+
+## 相关内容
+
+- [FitGrid](./fit-grid)：只使用 CSS Grid 自动调整列数，不观察紧凑状态或移动额外内容。
+- [CompactGrid 实验室](../lab/compact-grid)：观察大量实例在宽度和内容连续变化时的表现。
