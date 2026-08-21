@@ -1,0 +1,130 @@
+---
+description: 识别 CSS Grid 的显式列与隐式列，并通过约束隐式轨道尺寸保持列数测量的稳定语义。
+outline: true
+pageType: doc
+---
+
+# CSS Grid 隐式列
+
+CSS Grid 的最终网格不一定只包含 `grid-template-columns` 声明的列。Grid item 被放置到显式网格之外时，浏览器会自动创建隐式轨道；自动放置也可能在显式网格耗尽后继续扩展网格。
+
+这项能力让 CSS 可以容纳越界内容，但会给 JavaScript 的列数测量带来一个问题：读取 `grid-template-columns` 得到的结果可能同时包含显式列和隐式列，不能直接把序列化后的 track 数量理解为组件声明的列数。
+
+## 显式网格与隐式网格
+
+[`grid-template-columns`](https://drafts.csswg.org/css-grid-2/#track-sizing) 定义显式列。下面的容器拥有两个显式 track：
+
+```css
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+```
+
+如果一个 item 要求跨越的范围超过显式网格边界，浏览器仍然需要为它建立可放置的网格区域：
+
+```css
+.item {
+  grid-column: span 4;
+}
+```
+
+CSS Grid 规范将这种额外产生的行或列称为[隐式轨道](https://drafts.csswg.org/css-grid-2/#implicit-grids)。它们不属于模板声明，却会和显式轨道一起参与放置与尺寸计算。
+
+隐式列的尺寸由 [`grid-auto-columns`](https://drafts.csswg.org/css-grid-2/#propdef-grid-auto-columns) 决定。该属性的初始值是 `auto`，因此隐式列可能根据内容获得可见宽度，并改变整个网格的布局。
+
+## resolved value 会包含隐式轨道
+
+`getComputedStyle(element).gridTemplateColumns` 并不总是返回作者写入的 CSS 文本。对于已经生成 grid container box 的独立网格轴，CSS Grid 把它定义为特殊的 resolved value：浏览器返回 track 的 used value，并把隐式轨道一起序列化。
+
+例如，作者声明的值可能是：
+
+```css
+repeat(2, minmax(12rem, 1fr))
+```
+
+布局完成后读取到的结果可能更接近：
+
+```text
+240px 240px 96px 96px
+```
+
+后两项可能是 item 越界后产生的隐式列。规范也明确指出，隐式轨道会出现在 `grid-template-columns` 和 `grid-template-rows` 的序列化结果中，即使作者不能通过这些属性直接声明隐式轨道。
+
+这种行为使 resolved value 适合读取最终 track 尺寸，却无法天然回答“模板产生了多少个有效列”。
+
+## 将隐式列压缩到零宽
+
+如果列数语义只应来自显式模板，可以先约束所有隐式列：
+
+```css
+.grid {
+  grid-auto-columns: 0px;
+}
+```
+
+这不会阻止浏览器创建隐式 track。越界放置仍然存在，网格线编号也不会消失；变化的是这些隐式列的尺寸。resolved track list 因而可以表现为：
+
+```text
+240px 240px 0px 0px
+```
+
+列数统计随后忽略接近零宽的 track，只保留真正形成可见列宽的部分。
+
+这是一种“先约束布局结果，再从结果中恢复语义”的方案。单纯在 JavaScript 中记住模板列数不够，因为 `auto-fit` 产生的实际显式列数仍然依赖当前可用空间；单纯统计 resolved track list 又会把隐式列计算进去。零宽隐式轨道给两者建立了可区分的几何特征。
+
+## 使用保守阈值过滤轨道
+
+严格比较字符串是否等于 `0px` 会把逻辑绑定到浏览器的序列化格式。轨道尺寸还可能受到缩放、亚像素布局和浮点序列化影响，因此统计时先解析数值，再忽略小于保守阈值的 track：
+
+```ts
+const isVisibleTrack = (track: string): boolean => {
+  const size = Number.parseFloat(track);
+
+  if (Number.isNaN(size)) {
+    return true;
+  }
+
+  return size >= 1;
+};
+```
+
+当前采用 `1 CSS px` 作为可见轨道阈值。它不是 CSS Grid 规定的边界，而是对零宽轨道序列化误差的保守容忍。无法解析成数值的 token 会保留，避免因为遇到未知语法而静默减少列数。
+
+阈值过滤也意味着真实小于 `1px` 的显式轨道会被视为不可见。该方案适用于正常 UI 列宽，不是任意 CSS Grid track list 的通用语义分析器。
+
+## 解析 resolved track list
+
+常规浏览器会把独立网格轴的 resolved value 展开成带 used size 的 track list，因此简单场景可以按照空格分隔轨道并统计可见尺寸：
+
+```ts
+const columnCount = gridTemplateColumns
+  .trim()
+  .split(' ')
+  .filter((track) => track.length > 0 && isVisibleTrack(track))
+  .length;
+```
+
+还需要处理两种基础结果：
+
+- `none` 表示没有由模板建立的 track。
+- 部分非完整布局环境可能保留 `repeat(<固定数量>, ...)`，可以直接读取其中的固定重复次数。
+
+这种轻量解析依赖受控的模板语法。带有 line names、subgrid、复杂自定义序列化或空格嵌套结构的 track list 不能安全地用普通字符串切分。浏览器没有提供返回结构化 Grid track 对象的稳定 API；需要支持任意作者 CSS 时，应使用更严格的语法约束或专门的 CSS parser。
+
+## 读取本身依赖布局
+
+这里需要的是 used track size，而不是声明值。浏览器必须先完成 Grid item 放置和 track sizing，才能知道 `auto-fit` 展开了多少列、每列最终有多宽，以及是否生成隐式轨道。
+
+因此读取 `gridTemplateColumns` 可能要求浏览器结算样式和布局。它应被视为 layout read，避免放在 DOM write 之后逐实例交错执行。批量场景可以放入统一的 read 阶段，相关调度原则见[布局任务的分阶段批处理](./layout-task-scheduling)。
+
+## 能力边界
+
+- `grid-auto-columns: 0px` 只压缩隐式列尺寸，不会阻止隐式轨道、网格线或越界放置产生。
+- column gap、item 自身内容溢出和显式定位仍可能产生视觉影响，零宽轨道不等于越界布局完全不存在。
+- resolved track list 可能包含 line names 或平台特有的序列化差异，简单字符串切分只适合受控模板。
+- 小尺寸阈值会忽略真实但极窄的显式列。
+- `display: none`、尚未形成 grid container box 或 subgrid 会得到不同的 resolved value 语义。
+- 读取 used track size 是布局读取，不能视为纯字符串属性访问。
+
+这一方案的核心不是从 CSS 文本推导列数，而是先让浏览器完成真实 Grid 布局，再通过零宽隐式轨道把“模板列”和“布局兜底列”区分开。

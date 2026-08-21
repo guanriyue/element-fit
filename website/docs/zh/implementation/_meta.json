@@ -6,6 +6,16 @@
   },
   {
     "type": "file",
+    "name": "css-grid-implicit-columns",
+    "label": "CSS Grid 隐式列"
+  },
+  {
+    "type": "file",
+    "name": "dom-mirror-measurement",
+    "label": "DOM 镜像测量"
+  },
+  {
+    "type": "file",
     "name": "layout-task-scheduling",
     "label": "布局任务的分阶段批处理"
   },
