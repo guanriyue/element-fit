@@ -12,7 +12,7 @@ pageType: doc
 
 ## 内容范围
 
-后续技术内容按照以下主题组织：
+技术内容按照以下主题组织：
 
 - **测量与失效**：ResizeObserver、MutationObserver、content box、border box、几何缓存，以及什么变化会使缓存失效。
 - **布局任务调度**：DOM read/write stage、视窗优先级、React 同步提交，以及 forced reflow 的来源。
@@ -20,3 +20,7 @@ pageType: doc
 - **平台边界**：浏览器 API 精度、不可观测的 computed style 变化，以及实现选择对应的性能取舍。
 
 只有当一项内容需要解释内部算法或浏览器行为时，才应放入本栏目。用户为了正确使用组件必须知道的约束，应继续保留在对应的 Guide 页面中。
+
+## 组件算法
+
+- [InlineOverflow 的溢出测量](./inline-overflow)：整数尺寸初步判断、Range 临界校正与盒模型比较。
