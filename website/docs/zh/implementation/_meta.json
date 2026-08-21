@@ -8,5 +8,10 @@
     "type": "file",
     "name": "range-geometry",
     "label": "Range 几何测量"
+  },
+  {
+    "type": "file",
+    "name": "style-observation",
+    "label": "样式变化的观测与失效"
   }
 ]

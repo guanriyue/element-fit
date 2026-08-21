@@ -1,0 +1,149 @@
+---
+description: 在浏览器没有通用 computed style 观察能力时，组合尺寸、DOM 与应用状态信号，使布局测量及时失效。
+outline: true
+pageType: doc
+---
+
+# 样式变化的观测与测量失效
+
+布局测量的结果只在一组前提不变时有效：节点仍然相同、内容没有变化、可用空间没有变化，并且参与排版的样式仍然产生相同的几何结果。
+
+浏览器可以读取 computed style，却没有提供稳定、通用的 computed style 变化通知。Element Fit 因此不会尝试观察每一种样式来源，而是组合三类可观测信号：
+
+| 信号 | 适合发现的变化 | 无法表达的信息 |
+| --- | --- | --- |
+| React 与组件状态 | props、数据、选项和节点注册关系 | React 之外发生的变化 |
+| `ResizeObserver` | 元素盒子的最终尺寸变化 | 尺寸不变的内容和排版变化 |
+| `MutationObserver` | DOM 属性、文本与子节点变化 | 外部样式表、继承样式和媒体条件的计算结果 |
+
+这些信号不是彼此的降级方案。它们分别观察应用状态、布局结果和 DOM 原因，共同决定已有测量是否仍然可信。
+
+## 浏览器没有通用的样式观察器
+
+`getComputedStyle()` 是读取 computed style 的入口，不会在结果变化时主动通知调用方。样式的最终值可能来自节点自身、祖先、样式表、继承、媒体查询、容器查询和伪元素，浏览器也没有暴露这些值之间的完整依赖关系。
+
+CSSWG 中存在 [`ComputedStyleObserver` 提案](https://github.com/w3c/csswg-drafts/issues/8982)，目标是提供类似其他 Observer API 的 computed style 变化通知。该提案仍在讨论回调时机、观察属性和性能模型，目前不能作为组件库的运行时基础。
+
+另一种做法是在每一帧调用 `getComputedStyle()` 并比较选定属性。这会持续产生样式读取成本，还要求组件预先知道所有可能影响目标测量的 CSS 属性。字体、书写模式、盒模型和子树布局之间存在组合关系，仅比较一组属性也不能形成普遍正确的依赖追踪。
+
+Element Fit 采用可观测变化驱动的失效机制：只在组件能够明确识别输入变化，或者浏览器报告相关盒子尺寸变化时，废弃旧结果并安排新测量。
+
+## ResizeObserver 观察布局结果
+
+[`ResizeObserver`](https://drafts.csswg.org/resize-observer/) 观察元素生成的盒子。它适合回答两类与测量直接相关的问题：
+
+- 容器的 content box 是否改变，表示内容可使用的空间发生变化。
+- 内容的 border box 是否改变，表示元素实际占用的尺寸发生变化。
+
+观察回调优先使用 `ResizeObserverEntry` 提供的 `contentBoxSize` 或 `borderBoxSize`。这些值已经由浏览器随通知给出，可以避免为了读取同一尺寸再次调用 `getComputedStyle()` 或同步几何 API。兼容路径再使用 `contentRect` 或其他几何结果。
+
+`ResizeObserver` 观察的是结果，而不是导致结果的样式。固定宽度元素的字体发生变化时，元素盒子可能保持不变，但内部文本已经从完整展示变为溢出；目标元素不会仅因为这个变化而必然产生 resize 通知。子节点的尺寸变化如果没有传导到被观察元素的盒子，也具有相同边界。
+
+因此，ResizeObserver 可以作为尺寸缓存的权威更新来源，不能作为 computed style 观察器。
+
+## MutationObserver 观察 DOM 原因
+
+[`MutationObserver`](https://dom.spec.whatwg.org/#mutationobserver) 可以报告属性、文本和子节点变化。测量组件会按照目标内容选择最小的观察范围：
+
+```ts
+const contentOptions = {
+  subtree: true,
+  childList: true,
+  characterData: true,
+} satisfies MutationObserverInit;
+```
+
+这组配置适合内容型组件：文本修改、节点插入和节点移除都会使已有内容测量失效。它不会因为 `class` 或 `style` 改变而产生通知，因为没有开启 `attributes`。
+
+属性型组件可以只观察会影响测量的属性：
+
+```ts
+const textareaOptions = {
+  attributes: true,
+  attributeFilter: [
+    'class',
+    'cols',
+    'dir',
+    'id',
+    'lang',
+    'placeholder',
+    'rows',
+    'wrap',
+  ],
+} satisfies MutationObserverInit;
+```
+
+属性白名单把通知限制在已知输入上，避免 `aria-*`、`data-*` 或其他无关属性使测量反复失效。收到通知后还可以比较属性签名，跳过值没有实际变化的记录。
+
+MutationObserver 只观察 DOM mutation，不观察 CSS 计算结果。祖先的 class 变化、外部样式表更新和媒体查询切换不会因为正在观察后代而自动成为记录。只有这些变化同时改变了被 ResizeObserver 观察的盒子时，尺寸信号才能补上这一部分结果。
+
+## React 提供显式输入信号
+
+组件已经知道某些变化必然会影响测量时，显式失效比扩大 DOM 观察范围更准确。例如：
+
+- 受控值、默认值或自动尺寸选项改变。
+- 测量模式或精度选项改变。
+- Item、Accessory、Spacer 等参与布局的节点挂载、卸载或替换。
+- 业务数据改变并生成新的内容节点。
+
+这些信号由 props、effect、事件处理器或 ref 注册过程直接传递给 store。它们不需要等待浏览器推断变化原因，也不会把无关 DOM mutation 纳入测量路径。
+
+一套测量机制可以据此形成明确的数据流：
+
+```text
+可观测信号
+  → 使缓存失效
+  → 合并并调度测量
+  → 读取最新布局
+  → 仅提交仍然有效的结果
+```
+
+“失效”和“立即测量”是两个不同动作。观察回调负责声明旧结果不再可信，调度器负责合并短时间内重复出现的请求。测量真正开始前，新的信号还可以替换尚未执行的旧任务；测量结束时，也需要确认节点和选项仍然与任务创建时一致。
+
+## 过滤组件自己的 DOM mutation
+
+部分测量会临时挂载镜像节点，或者在 Root 内插入 Spacer、Suffix 等内部节点。如果 Root 同时启用了 MutationObserver，组件自己的 DOM 写入也会形成 mutation record。
+
+只使用 `measuring` 布尔值无法可靠过滤这些记录。MutationObserver 回调异步送达；记录进入回调时，当前测量事务可能已经结束，标记也已经恢复。
+
+Element Fit 会在内部节点参与 DOM 之前，把该节点及其 subtree 记录到 `WeakSet<Node>`：
+
+1. record 的 target 位于已标记 subtree 时，忽略这条记录。
+2. `childList` record 的 added nodes 和 removed nodes 全部来自已标记 subtree 时，忽略这条记录。
+3. 同一批 records 中存在任意业务内容变化时，仍然使测量失效。
+
+使用 WeakSet 有两个作用：标记不会强引用已经移除的内部节点；节点从 DOM 移除后，延迟送达的 record 仍然可以通过节点身份识别。这样既不会由组件自己的写入触发测量循环，也不会因为一个批次混入内部记录而遗漏真实内容变化。
+
+## 缓存失效应与缓存依据一致
+
+缓存可以跳过重复测量，但每一条复用规则都必须对应明确的失效信号。一个典型的 overflow 缓存可能依赖：
+
+- 当前 Root 和 Content 的节点身份。
+- Root 的 content-box width。
+- Content 的文本与子节点结构。
+- 影响判定方式的组件选项。
+
+节点替换、内容 mutation 或选项变化会直接清除缓存；Root resize 则更新宽度，并根据已有结果能否单调推断决定复用还是重测。Content resize 本身是否使缓存失效，需要由缓存语义决定，不能仅因为观察器产生了通知就一律清除。
+
+同样，测量组件写入自身尺寸后可能收到 ResizeObserver 回调。回调应比较真正作为输入的维度。例如 Textarea 的高度由测量结果写入，而文本换行依赖 content-box width；只在 width 改变时重新测量，可以避免高度提交形成反馈循环。
+
+## 可观测边界
+
+组合 ResizeObserver、MutationObserver 和显式状态仍然不是完整的 computed style 依赖追踪。以下变化只有在触发了当前观察范围内的 DOM mutation、显式输入信号或目标盒子 resize 时，才会被发现：
+
+- 外部样式表规则改变。
+- 祖先 class 或 style 改变。
+- 继承样式、媒体查询或容器查询切换。
+- 字体度量变化，但被观察元素的盒子保持不变。
+- 伪元素内容和其他不属于目标 DOM subtree 的布局输入。
+
+为了覆盖这些情况而持续轮询 computed style，会把有限的布局测量变成常驻工作，并且仍然无法自动推导所有 CSS 依赖。Element Fit 保留这一可观测边界，优先让每次失效都有明确来源。
+
+## 当前应用方式
+
+- InlineOverflow 观察 Root 和 Content 的尺寸，并观察 Content subtree 的文本与子节点变化。
+- LineClamp 观察 Root 尺寸和内容 mutation，同时过滤 Spacer、Suffix 与测量镜像产生的内部记录。
+- Textarea 组合受控值、输入事件、选项、样式 props、尺寸变化和属性白名单。
+- FitSwitch、CompactGrid 与 OverflowList 主要依赖已注册节点的生命周期和尺寸信号，不为所有样式变化增加宽泛的 DOM 观察。
+
+组件选择的信号不同，但遵循相同原则：先定义测量结果依赖什么，再为可观测依赖建立失效入口。
