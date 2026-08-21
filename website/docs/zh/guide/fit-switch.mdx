@@ -1,31 +1,185 @@
 ---
-description: FitSwitch 会根据完整视图是否能放入当前空间，在两套完整表达之间切换。
+description: FitSwitch 根据完整视图所需宽度，在 Expanded 和 Collapsed 两套视图之间切换。
 outline: true
 pageType: doc
 ---
 
 # FitSwitch
 
-`FitSwitch` 用来声明两套完整视图：`Collapsed` 和 `Expanded`。它会测量 `Expanded` 视图需要的宽度，并使用两个视图共同的父元素作为可用宽度容器。
+`FitSwitch` 用来声明两套完整视图：优先展示的 `Expanded` 和空间不足时使用的 `Collapsed`。组件比较 Expanded 所需宽度与两个 View 共同父元素的可用宽度，并选择能够使用的表达方式。
 
-当 `Expanded` 能放下时，显示完整视图；当放不下时，切换到 `Collapsed` 视图。
+Collapsed 和 Expanded 始终保持挂载。FitSwitch 通过 View 上的状态 attribute 和 `inert` 表达当前模式，View 的定位、隐藏、裁切和过渡样式由调用方定义。
 
-组件不会为两个 view 注入展示或布局样式，只在当前未选中的 view 上添加空值的 `data-fit-inactive` attribute；当前展示的 view 不带该 attribute。调用方需要让 inactive view 脱离常规流并在视觉上隐藏它，通常可以根据 dataset 设置 `position: absolute` 与 `opacity: 0`。不要使用 `display: none`，否则组件无法继续测量 Expanded 的宽度。
+## 适用场景
 
-当当前展示的 Expanded 因内容、字体或样式令其观测宽度发生变化而放不下时，它会在切换为 inactive 的同时短暂获得 `data-fit-invalidated` attribute。它会至少保留一个绘制帧，调用方可通过 `data-fit-invalidated:transition-none` 关闭新版 Expanded 的退出动画，同时保留 Collapsed 的进入动画。Collapsed 切换到 Expanded 以及 Container 宽度变化不会添加该 attribute，因此仍可保留正常的双向切换动画。
+FitSwitch 适合工具栏、Tabs、分页器和操作区等具有两套完整表达的界面，例如：
 
-下面的 tabs 示例中，完整视图显示“图标 + 文案”，紧凑视图只显示图标。可以连续调整容器宽度，并改变 tab 数量、标签长度、Expanded padding、`asChild` 和过渡样式，观察切换临界点如何变化。
+- Expanded 展示“图标 + 文案”，Collapsed 只展示图标。
+- Expanded 展示一排操作按钮，Collapsed 展示一个菜单入口。
+- 两套视图需要保持挂载，以便执行双向切换动画。
+- 业务状态可以提升到共同父组件，并由两套视图共享。
+
+FitSwitch 的切换单位是整套 View。需要保留一组操作的前部 Item、只把尾部操作收进菜单时，应使用 [OverflowList](./overflow-list)。需要始终使用同一个业务节点、只改变节点内部内容时，应使用针对该状态模型设计的组件或业务布局。
+
+## 导入
+
+```tsx
+import { FitSwitch } from '@guanriyue/react-fit/fit-switch';
+```
+
+## 基础用法
+
+FitSwitch 自身不创建 DOM。Collapsed 和 Expanded 最终渲染出的 HTMLElement 必须是同一个父元素下的直接子节点，这个共同父元素的 content box 表示全部可用宽度。
+
+```tsx
+<div className="relative min-w-0 overflow-hidden">
+  <FitSwitch>
+    <FitSwitch.Collapsed className={viewClassName}>
+      <CompactActions />
+    </FitSwitch.Collapsed>
+
+    <FitSwitch.Expanded className={viewClassName}>
+      <FullActions />
+    </FitSwitch.Expanded>
+  </FitSwitch>
+</div>
+```
+
+下面的 Tabs 示例中，Expanded 展示图标和文案，Collapsed 只展示图标。可以调整容器宽度、Tab 数量、标签长度、Expanded padding、`asChild` 和过渡样式，观察切换临界点。
 
 ```tsx file="<root>/src/demos/fit-switch/tabs.tsx" preview
 
 ```
 
-## 裁切切换动画
+## View 状态
 
-两个 view 会始终保持挂载，并通过 `data-fit-inactive` 标记当前 inactive view。下面的工具栏让共同 parent 右对齐并设置 `overflow: hidden`：Expanded 在 inactive 状态下向右移动自身宽度，attribute 被移除时从右向左划入；反向切换时则向右划出。Collapsed 使用相同的状态旋转并显示齿轮按钮。当前展示的 Expanded 因自身尺寸变化切换为 Collapsed 时，`data-fit-invalidated:transition-none` 会跳过已经失效的 Expanded 退出动画，并保留 Collapsed 的进入动画。
+当前展示的 View 保持调用方传入的 `inert` 值。另一个 View 带有空值的 `data-fit-inactive` attribute，并被强制设置为 `inert`，阻止键盘焦点和用户交互进入 inactive 子树。
 
-示例没有降低 Expanded 的 opacity，而是通过 Tailwind 状态变体在 inactive 状态下设置 `position: absolute` 和 `translate-x-full`，使它完全依靠 transform 和父容器裁切隐藏。transform 不改变 ResizeObserver 读取的 border-box width，因此不会干扰 FitSwitch 的宽度判定。
+调用方应使用 `data-fit-inactive` 让 inactive View 脱离常规流并在视觉上隐藏，同时保留可测量的 border box：
+
+```tsx
+const viewClassName =
+  'w-max data-fit-inactive:absolute data-fit-inactive:opacity-0';
+```
+
+共同父元素通常需要 `position: relative`，并根据切换效果选择 `overflow: hidden`。inactive View 应继续参与尺寸观察，不能使用 `display: none`。
+
+Expanded 应使用 `inline-flex`、`inline-block`、`width: max-content` 或等价样式，使 border box 表达完整内容所需宽度。默认块级拉伸、`width: 100%` 或其他受父元素约束的宽度，可能使测得宽度只等于已分配空间，无法表达内容的真实需求。
+
+## 内容变化与切换动画
+
+当当前展示的 Expanded 因内容或样式变化而增宽，并因此切换到 Collapsed 时，Expanded 会短暂获得 `data-fit-invalidated`。这个状态至少保留一个绘制帧，用来表示 Expanded 已经不是上一帧中有效的完整视图。
+
+调用方可以只为这次切换关闭 Expanded 的 transition，同时保留 Collapsed 的进入动画：
+
+```tsx
+const viewClassName =
+  'transition data-fit-inactive:absolute data-fit-inactive:opacity-0 data-fit-invalidated:transition-none';
+```
+
+容器宽度变化产生的正常双向切换不会设置 `data-fit-invalidated`。Collapsed 切换回 Expanded 时也不会设置该状态。
+
+下面的工具栏使用父元素裁切和 transform 完成切换：Expanded 在 inactive 状态下向右移出，Collapsed 同时旋转并显示菜单按钮。transform 只改变视觉结果，不改变 ResizeObserver 读取的 border-box width。
 
 ```tsx file="<root>/src/demos/fit-switch/actions-animation.tsx" preview
 
 ```
+
+## 布局与测量
+
+FitSwitch 使用两个尺寸作为判断依据：
+
+- Collapsed 和 Expanded 共同父元素的 content-box inline size。
+- Expanded 自身的 border-box inline size。
+
+View 的 margin、transform、outline 和 box-shadow 不属于 border box，不参与所需宽度计算。共同父元素中的其他常规流内容、padding 之外的空间分配和 gap 也不会从可用宽度中单独扣除，因此共同父元素应完整表示两套 View 可以使用的横向空间。
+
+Expanded 的内容、字体、padding、border 或其他因素令 border box 变化时，组件会直接重新判断当前模式。共同父元素尺寸变化时，测量任务会根据元素与视窗的距离安排优先级；远离视窗的实例可能稍后完成切换。调度机制详见[实现原理](../implementation/)。
+
+## 状态与生命周期
+
+首次可信测量完成前，Collapsed 是当前 View，Expanded 带有 `data-fit-inactive`。组件同时获得父元素和 Expanded 的尺寸后，再决定是否切换到 Expanded。
+
+两套 View 是彼此独立的 React 子树：
+
+- 两边的组件都会挂载并执行各自的 effect。
+- View 切换不会卸载任一子树，各自的内部状态会保留。
+- 同一个业务状态不会在两棵子树之间自动同步，通常应提升为受控状态。
+- 同一业务对象在 DOM 中存在两个节点，需要保证 id、表单字段和 DOM 关系不会相互冲突。
+
+inactive View 的 `inert` 负责阻止交互和焦点进入，但不会改变两套子树同时存在这一状态模型。
+
+## API 参考
+
+### Root
+
+为 Collapsed 和 Expanded 提供共享 store。Root 只渲染 Context Provider，不创建 DOM 元素，也不接收 ref 或 `asChild`。
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `children` | `ReactNode` | `undefined` | 声明一个 Collapsed 和一个 Expanded。 |
+
+### Collapsed
+
+声明 Expanded 无法放入共同父元素时展示的完整视图，默认渲染为 `div`。
+
+**默认元素：** `div`  
+**Ref：** `HTMLElement`  
+**支持 `asChild`：** 是
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `asChild` | `boolean` | `false` | 将 View 的 props、ref、状态 attribute 和 `inert` 合并到唯一 child。 |
+| `inert` | `boolean` | `false` | Collapsed 处于当前模式时使用的 inert 值；inactive 时始终为 `true`。 |
+
+除上述属性外，Collapsed 支持 `div` 的原生属性。
+
+#### Data attributes
+
+| Attribute | Value | Condition |
+| --- | --- | --- |
+| `data-fit-inactive` | `""` | 当前模式不是 Collapsed 时存在。 |
+
+### Expanded
+
+声明优先展示和测量所需宽度的完整视图，默认渲染为 `div`。
+
+**默认元素：** `div`  
+**Ref：** `HTMLElement`  
+**支持 `asChild`：** 是
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `asChild` | `boolean` | `false` | 将 View 的 props、ref、状态 attribute 和 `inert` 合并到唯一 child。 |
+| `inert` | `boolean` | `false` | Expanded 处于当前模式时使用的 inert 值；inactive 时始终为 `true`。 |
+
+除上述属性外，Expanded 支持 `div` 的原生属性。
+
+#### Data attributes
+
+| Attribute | Value | Condition |
+| --- | --- | --- |
+| `data-fit-inactive` | `""` | 当前模式不是 Expanded 时存在。 |
+| `data-fit-invalidated` | `""` | 当前展示的 Expanded 因自身宽度变化而切换为 Collapsed 时短暂存在。 |
+
+## 边界
+
+- 一个 FitSwitch 应包含一个 Collapsed 和一个 Expanded。缺少任一 View 时无法建立完整测量关系。
+- Collapsed 和 Expanded 最终渲染出的 HTMLElement 必须是同一个父元素下的直接子节点。
+- 共同父元素的 content box 应完整表达 View 可以使用的宽度。
+- Expanded 的 border box 必须表达完整内容所需宽度，并在 active 和 inactive 状态下保持相同的宽度语义。
+- inactive View 应脱离常规流并保持可测量，不能使用 `display: none`。
+- View margin、视觉 transform、outline 和 box-shadow 不参与宽度判断。
+- CSS `contain: size`、`display: contents`、脱离尺寸计算的绝对定位子内容和不同横向书写模式不属于稳定测量模型。
+- 两套 View 同时挂载，业务状态、DOM id 和表单语义需要按照两份独立子树设计。
+
+## 相关内容
+
+- [OverflowList](./overflow-list)：保留连续的前部操作，并把尾部操作数据交给自定义溢出渲染器。
+- [FitSwitch 实验室](../lab/fit-switch)：观察大量实例在宽度和内容连续变化时的切换表现。
