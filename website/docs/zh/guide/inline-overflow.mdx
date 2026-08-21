@@ -36,31 +36,19 @@ Root 和 Content 都不提供默认样式。调用方需要让 Root 形成可测
 
 首次可信测量完成后，`onOverflowChange` 会调用。之后仅在布尔状态变化，或者 Root、Content 元素替换并完成新的首次测量时调用。溢出时，Root 带有 `data-overflow` attribute；Content 和 Accessory 不重复暴露该状态。
 
-## 测量模型
+## 测量精度
 
-### 常规测量
+InlineOverflow 首先使用 `scrollWidth` 和可用宽度进行初步判断。浏览器向 JavaScript 暴露的 `scrollWidth` 和 `clientWidth` 是整数，而文本布局仍然可能落在亚像素边界，因此两者相等或差值很小时，初步结果的置信度不足。
 
-Root 与 Content 分离时，组件比较 Content 的 `scrollWidth` 与 Root 扣除 inline padding 后的 content-box width；单元素模式则直接比较同一元素的 `scrollWidth` 和 `clientWidth`。绝大多数情况下，这条路径可以直接得到结果。
+当差值进入 `1 CSS px` 的保守临界区间时，组件会使用 `Range.getBoundingClientRect()` 读取保留小数的内容几何，并完成第二级判断。整数尺寸始终作为第一级判断，Range 只负责校正它无法区分的临界结果。
 
-CSSOM View 将 `scrollWidth` 和 `clientWidth` 定义为 Web IDL 的 [`long`](https://drafts.csswg.org/cssom-view/#extensions-to-the-element-interface)，因此 JavaScript 最终读取到的是整数。恰好位于 ellipsis 临界像素时，浏览器可能已经绘制省略号，但两个整数仍然相等，普通的 `scrollWidth > clientWidth` 判断会漏掉溢出。CSSWG 的 [issue #4123](https://github.com/w3c/csswg-drafts/issues/4123) 记录了这个平台问题。
+Range API 是组件规避浏览器尺寸 Bug 的一种解决方案。它读取的是已渲染内容的几何包围盒，而不是浏览器的 ellipsis 状态。该机制适用于普通单行文本和一部分混合 inline 内容；margin、伪元素、定位、transform 和多行排版不属于稳定的测量范围。完整的判断过程、相关社区问题与盒模型处理见 [InlineOverflow 的溢出测量](../implementation/inline-overflow)。
 
-### Range 临界修正
+### Ellipsis 边界校正
 
-当常规测量落在小于 `1px` 的临界区间时，组件会使用 [`Range`](https://developer.mozilla.org/zh-CN/docs/Web/API/Range) 选中 Content 的内容，再通过 [`Range.getBoundingClientRect()`](https://developer.mozilla.org/zh-CN/docs/Web/API/Range/getBoundingClientRect) 获取保留小数精度的包围矩形宽度，并与同一个可用宽度继续比较。
+下面两组内容、布局和宽度完全一致，用于对比启用 Range 临界校正和只使用整数尺寸判断时的结果。
 
-Range 是这里修正常规 overflow 判断误差的核心 API。[CSSOM View](https://drafts.csswg.org/cssom-view/#extensions-to-the-range-interface) 规定，Range 的矩形由选中的文本片段和顶层元素 border area 组成：文本宽度依据字体 advance width 计算，完整选中的顶层元素则贡献自己的 border area。这解释了它为什么适合普通单行文本和一部分混合 inline 内容。
-
-### 浏览器与内容限制
-
-`Range` 和 `Range.getBoundingClientRect()` 已在主流浏览器中广泛可用，但规范只定义 Range 如何汇总几何矩形，并没有规定它必须返回“ellipsis 截断前的 intrinsic width”，也没有定义一个统一的“是否已经绘制省略号”查询。因此，这个 fallback 是基于现有浏览器行为的工程性修正，不保证在所有浏览器和所有 DOM 结构中都能解决临界误判。
-
-Range 几何计算本身也存在浏览器特有的边界问题。例如 WebKit 的 [issue #296765](https://bugs.webkit.org/show_bug.cgi?id=296765) 记录了换行文本 Range 矩形与其他引擎不一致的情况。该问题并非本组件单行场景的直接复现，但说明不能把某一个浏览器中的 Range 结果外推为通用保证。对浏览器覆盖要求较高时，应在目标浏览器中验证实际内容结构，并为完整内容保留 Tooltip 等可访问路径。
-
-## Ellipsis 边界校正
-
-下面两组内容、布局和宽度完全一致，用于对比“启用 Range 临界修正”和“仅使用普通判断”时的判定差异。
-
-> 静态截图：下图用于展示边界校正可能带来的判定差异，不是可交互 demo。这个现象只在极限边界情况下才可能复现，通常需要多次调整文本或宽度。下面的 preview 示例可以用于本地继续观察。
+如图所示，Range 临界校正可以识别整数尺寸判断遗漏的 ellipsis 状态。
 
 ![启用边界校正和关闭边界校正时的 ellipsis 判定对比](/inline-overflow-range-diff.png)
 
@@ -70,11 +58,11 @@ Range 几何计算本身也存在浏览器特有的边界问题。例如 WebKit 
 
 ```
 
-## 多个 Inline 节点的边界校正
+### 多个 Inline 节点
 
-下面示例包含 `inline-block` 和 `inline-flex` 节点。Range 会包含普通 flow 中被选中的文本和顶层元素 border area，但 margin、伪元素、定位和 transform 等不属于可靠测量范围。两组内容、布局和宽度保持一致，用于观察此类内容在“启用边界校正”和“关闭边界校正”时的结果。
+下面示例包含 `inline-block` 和 `inline-flex` 节点。两组内容、布局和宽度保持一致，用于观察混合节点进入 Range 临界校正后的结果。
 
-> 静态截图：下图用于展示多个 inline 节点场景下的对比效果，不是可交互 demo。这个现象同样只在极限边界情况下才可能复现。下面的 preview 示例可以用于本地继续观察。
+如图所示，混合 inline 节点也可以参与 Range 临界校正。
 
 ![多个 inline 节点在启用边界校正和关闭边界校正时的对比](/inline-overflow-inline-nodes-diff.png)
 
@@ -155,8 +143,82 @@ Root、Content 和 Accessory 都支持 `asChild`。组件会把 ref、状态属�
 
 ## 观测边界
 
-组件使用 ResizeObserver 监听 Root 和 Content 的尺寸变化，并使用 MutationObserver 监听 Content subtree 中的文本和子节点变化。MutationObserver 不观察 attributes；仅修改 class、style、继承样式、已加载字体或伪元素内容时，如果 Root 和 Content 的盒子尺寸都没有变化，组件不保证重新测量。
+组件使用 ResizeObserver 监听 Root 和 Content 的尺寸，并使用 MutationObserver 监听 Content subtree 中的文本和子节点变化。Root 或 Content 元素替换，以及 Content 中的文本或子节点变化，会重新建立测量结果。
 
-浏览器目前没有稳定可用的 Computed Style Observer。`font-size`、`font-family`、`letter-spacing` 等 computed style 的变化本身无法被直接观测，因此由这些样式变化导致的 overflow 变化也不保证被捕获。兄弟选择器、父子选择器、主题 class、响应式 class 等间接改变 Content 文本布局的写法都需要谨慎使用；只有等类似 [ComputedStyleObserver](https://github.com/w3c/csswg-drafts/issues/8982) 的能力成熟后，这类变化才可能被更稳定地观测。
+MutationObserver 不观察 attributes。只修改 class、style、继承样式、字体或伪元素内容时，如果 Root 的可用宽度和 Content subtree 都没有发生可观测变化，组件不保证重新测量。通过主题 class、响应式 class 或外部样式表改变文本布局时，应在目标交互中验证 overflow 状态是否能够重新建立。
 
-首次客户端测量前，内部 overflow 状态为 `false`，`data-overflow` 不存在，Accessory 不渲染。当前不提供 `defaultOverflow`、受控 `overflow` 或手动 remeasure API。
+首次可信测量完成前，内部 overflow 状态为 `false`，`data-overflow` 不存在，Accessory 不渲染。当前不提供 `defaultOverflow`、受控 `overflow` 或手动 remeasure API。
+
+## API 参考
+
+### Root
+
+包含 InlineOverflow 的全部部分，默认渲染为 `span`。Root 的 content box 表示 Content 可以使用的目标宽度。
+
+**默认元素：** `span`  
+**Ref：** `HTMLElement`  
+**支持 `asChild`：** 是
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `onOverflowChange` | `(overflow: boolean) => void` | — | 首次可信测量完成后调用；之后在 overflow 状态变化，或者 Root、Content 元素替换并完成新测量时调用。 |
+| `asChild` | `boolean` | `false` | 将 Root 的 props、ref 和 overflow 状态合并到唯一 child。 |
+
+除上述属性外，Root 支持 `span` 的原生属性。
+
+#### Data attributes
+
+| Attribute | Value | Condition |
+| --- | --- | --- |
+| `data-overflow` | `""` | Content 发生横向溢出时存在。 |
+
+### Content
+
+声明唯一的溢出测量节点，默认渲染为 `span`。Content 的单行排版和裁剪样式由调用方提供。
+
+**默认元素：** `span`  
+**Ref：** `HTMLElement`  
+**支持 `asChild`：** 是
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `asChild` | `boolean` | `false` | 将 Content 的 props、ref 和测量行为合并到唯一 child。 |
+
+除上述属性外，Content 支持 `span` 的原生属性。
+
+### Accessory
+
+声明只在 Content 溢出时渲染的附属节点，默认渲染为 `span`。Accessory 不参与溢出判定。
+
+**默认元素：** `span`  
+**Ref：** `HTMLElement`  
+**支持 `asChild`：** 是
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `asChild` | `boolean` | `false` | 将 Accessory 的 props 和 ref 合并到唯一 child。 |
+
+除上述属性外，Accessory 支持 `span` 的原生属性。未溢出时 Accessory 渲染为 `null`，对应子树的状态和 ref 不会保留。
+
+## 边界
+
+- InlineOverflow 只判断横向单行内容，不支持多行截断和纵向书写模式。
+- 一个 Root 只应包含一个 Content。Content 是唯一的内容测量节点。
+- Root 的 content box 应表达 Content 的目标可用宽度。
+- Root 与 Content 分离时，不应在 Content 上增加改变测量语义的 padding 或 margin。
+- Accessory 必须位于对应 Root 的 React context 中，但不要求与 Content 相邻或同行。
+- Accessory 不参与溢出判定；渲染后占用的空间不会反向改变判定基准。
+- Range 临界校正只测量已经参与布局的 DOM 内容，不提供任意 DOM 子树的 intrinsic width。
+- 复杂 transform、定位、伪元素和浏览器未反映到观测尺寸中的视觉变化不属于稳定测量模型。
+
+## 相关内容
+
+- [InlineOverflow 的溢出测量](../implementation/inline-overflow)：整数尺寸、Range 临界校正与盒模型处理。
+- [InlineOverflow 实验室](../lab/inline-overflow)：观察临界宽度和大量实例下的测量结果。
+- [LineClamp](./line-clamp)：判断多行内容是否超过指定行数。
