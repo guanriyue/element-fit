@@ -272,6 +272,21 @@ CompactGridItem.displayName = 'CompactGridItem' as const;
 export const CompactGridExtra = forwardRef<HTMLDivElement, CompactGridExtraProps>((props, ref) => {
   const { children, ...restProps } = props;
   const store = useCompactGridStore('CompactGrid.Extra');
+  const unregisterExtraRef = useRef<(() => void) | null>(null);
+  const registerExtraRef = useCallback(
+    (extra: HTMLDivElement | null) => {
+      if (unregisterExtraRef.current) {
+        unregisterExtraRef.current();
+        unregisterExtraRef.current = null;
+      }
+
+      if (extra) {
+        unregisterExtraRef.current = store.registerExtra(extra);
+      }
+    },
+    [store],
+  );
+  const extraRef = useComposedRefs(ref, registerExtraRef);
   const compact = useCompactGridSelector('CompactGrid.Extra', (state) => {
     return state.compact;
   });
@@ -289,7 +304,7 @@ export const CompactGridExtra = forwardRef<HTMLDivElement, CompactGridExtraProps
   }
 
   return (
-    <Primitive.div {...restProps} ref={ref} data-rf-compact-grid-extra="">
+    <Primitive.div {...restProps} ref={extraRef}>
       {children}
     </Primitive.div>
   );
@@ -345,7 +360,6 @@ export const CompactGridExtraSlot = forwardRef<HTMLSpanElement, CompactGridExtra
       <Primitive.span
         {...restProps}
         ref={slotRef}
-        data-rf-compact-grid-extra-slot=""
         hidden={hidden || !compact || !active}
       >
         {compact && active ? extra : null}

@@ -53,6 +53,7 @@ export type CompactGridStore = {
   subscribe: (listener: CompactGridListener) => () => void;
   setExtra: (extra: React.ReactNode) => void;
   setRootElement: (root: HTMLElement | null) => void;
+  registerExtra: (extra: HTMLElement) => () => void;
   registerItem: (item: HTMLElement, options: CompactGridItemOptions) => () => void;
   registerSlot: (slot: HTMLElement) => () => void;
 };
@@ -84,21 +85,26 @@ const getItemSpan = (colSpan: CompactGridItemColSpan | undefined, columnCount: n
 const getLayoutItems = (
   root: Element,
   items: Map<HTMLElement, CompactGridItemOptions>,
+  extraElement: HTMLElement | null,
 ): CompactGridLayoutItem[] => {
   const layoutItems: CompactGridLayoutItem[] = [];
 
   for (let index = 0; index < root.children.length; index += 1) {
     const child = root.children.item(index);
 
-    if (child === null || child.hasAttribute('data-rf-compact-grid-extra')) {
+    if (child === null) {
       continue;
     }
 
-    const registeredItem = child instanceof HTMLElement ? items.get(child) : undefined;
+    if (child === extraElement) {
+      continue;
+    }
+
+    const item = child instanceof HTMLElement ? items.get(child) : undefined;
 
     layoutItems.push({
       element: child,
-      colSpan: registeredItem?.colSpan,
+      colSpan: item?.colSpan,
     });
   }
 
@@ -140,13 +146,14 @@ const getLayoutCompact = (
   root: Element | null,
   slot: HTMLElement | null,
   items: Map<HTMLElement, CompactGridItemOptions>,
+  extraElement: HTMLElement | null,
   columnCount: number,
 ): boolean => {
   if (!root || !slot || !root.children.length) {
     return false;
   }
 
-  const layoutItems = getLayoutItems(root, items);
+  const layoutItems = getLayoutItems(root, items, extraElement);
 
   return getLayoutItemsCompact(layoutItems, slot, columnCount);
 };
@@ -201,6 +208,7 @@ export const createCompactGridStore = (): CompactGridStore => {
   let rootElement: HTMLElement | null = null;
   let unobserveResize: (() => void) | null = null;
   let extra: React.ReactNode = null;
+  let extraElement: HTMLElement | null = null;
   let snapshot = createSnapshot(null, null, false, 0);
   const listeners = new Set<CompactGridListener>();
   const items = new Map<HTMLElement, CompactGridItemOptions>();
@@ -232,7 +240,13 @@ export const createCompactGridStore = (): CompactGridStore => {
     const columnCount = rootElement
       ? getColumnCount(getComputedStyle(rootElement).gridTemplateColumns)
       : 0;
-    const layoutCompact = getLayoutCompact(rootElement, activeSlot, items, columnCount);
+    const layoutCompact = getLayoutCompact(
+      rootElement,
+      activeSlot,
+      items,
+      extraElement,
+      columnCount,
+    );
 
     commit(createSnapshot(extra, activeSlot, layoutCompact, columnCount));
   };
@@ -265,6 +279,19 @@ export const createCompactGridStore = (): CompactGridStore => {
       }
 
       scheduleMeasure();
+    },
+    registerExtra: (element) => {
+      extraElement = element;
+      scheduleMeasure();
+
+      return () => {
+        if (extraElement !== element) {
+          return;
+        }
+
+        extraElement = null;
+        scheduleMeasure();
+      };
     },
     registerItem: (item, options) => {
       items.set(item, options);
