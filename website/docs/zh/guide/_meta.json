@@ -6,23 +6,18 @@
   },
   {
     "type": "file",
-    "name": "fit-grid",
-    "label": "FitGrid"
-  },
-  {
-    "type": "file",
     "name": "compact-grid",
     "label": "CompactGrid"
   },
   {
     "type": "file",
-    "name": "fit-switch",
-    "label": "FitSwitch"
+    "name": "fit-grid",
+    "label": "FitGrid"
   },
   {
     "type": "file",
-    "name": "overflow-list",
-    "label": "OverflowList"
+    "name": "fit-switch",
+    "label": "FitSwitch"
   },
   {
     "type": "file",
@@ -33,6 +28,11 @@
     "type": "file",
     "name": "line-clamp",
     "label": "LineClamp"
+  },
+  {
+    "type": "file",
+    "name": "overflow-list",
+    "label": "OverflowList"
   },
   {
     "type": "file",

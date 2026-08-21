@@ -16,11 +16,6 @@
   },
   {
     "type": "file",
-    "name": "overflow-list",
-    "label": "OverflowList"
-  },
-  {
-    "type": "file",
     "name": "inline-overflow",
     "label": "InlineOverflow"
   },
@@ -31,17 +26,22 @@
   },
   {
     "type": "file",
+    "name": "overflow-list",
+    "label": "OverflowList"
+  },
+  {
+    "type": "file",
     "name": "textarea",
     "label": "Textarea"
   },
   {
     "type": "file",
-    "name": "real-world",
-    "label": "综合业务场景"
+    "name": "overflow-list-dom",
+    "label": "实验实现：OverflowList DOM"
   },
   {
     "type": "file",
-    "name": "overflow-list-dom",
-    "label": "实验实现：OverflowList DOM"
+    "name": "real-world",
+    "label": "综合业务场景"
   }
 ]
