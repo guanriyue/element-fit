@@ -1,55 +1,255 @@
 ---
-description: OverflowList 会保留能够放入当前空间的操作，并把尾部操作数据交给自定义的溢出渲染器。
+description: OverflowList 保留能够放入单行空间的前部 Item，并把尾部 Item 数据交给自定义溢出渲染器。
 outline: true
 pageType: doc
 ---
 
 # OverflowList
 
-`OverflowList` 用于单行操作列表。它把可以直接展示的操作声明为 `Item`，空间不足时隐藏 DOM 顺序末尾连续的 Item，并通过 `Overflow` 把对应的 `data` 交给调用方。Dropdown、菜单项和交互方式均不由组件内置。
+`OverflowList` 用于有明确优先顺序的单行操作列表。空间足够时展示全部 Item；空间不足时保留 DOM 顺序中的连续前缀，并通过 `Overflow` 把尾部 Item 的业务数据交给调用方。
 
-`Accessory` 用来声明仅在存在溢出 Item 时展示的真实布局元素，例如 Dropdown Trigger。Accessory 的内容和宽度完全由调用方决定；组件会把它挂载到真实布局中测量，不要求提前声明固定宽度。
+调用方使用 `Accessory` 声明溢出状态下需要占据布局空间的元素，例如更多按钮、菜单 Trigger 或计数器。Dropdown、菜单项、操作执行方式和视觉样式由业务组件组合。
 
-下面的工具栏可以连续调整宽度、条件渲染 Item，并切换按钮文案长度。空间不足时，尾部操作会进入省略号菜单；空间恢复后，它们会重新出现在工具栏中。
+## 适用场景
+
+OverflowList 适合工具栏、卡片操作区和表格行操作等场景：
+
+- Item 节点顺序可以直接表达保留优先级。
+- 空间不足时只隐藏尾部连续操作。
+- 隐藏操作需要在菜单、Popover 或其他自定义界面中继续提供。
+- 更多入口的真实宽度需要参与可见 Item 数量计算。
+
+如果紧凑状态需要切换整套视图，应使用 [FitSwitch](./fit-switch)。如果隐藏 Item 必须继续保留组件状态、焦点或未受控输入值，应使用保持单一业务节点的专用布局。
+
+## 导入
+
+```tsx
+import { OverflowList } from '@guanriyue/react-fit/overflow-list';
+```
+
+## 基础用法
+
+下面的工具栏可以连续调整宽度、操作数量和按钮文案，并支持切换 LTR 与 RTL。空间不足时，尾部操作会出现在省略号菜单中；空间恢复后，它们重新回到工具栏。
 
 ```tsx file="<root>/src/demos/overflow-list/actions.tsx" preview
 
 ```
 
-## 组合方式
+## 组合结构
 
 ```tsx
-<OverflowList>
-  <OverflowList.Item data={dataA}>Item A</OverflowList.Item>
-  <OverflowList.Item data={dataB}>Item B</OverflowList.Item>
+<OverflowList className="flex min-w-0 items-center gap-2">
+  {actions.map((action) => (
+    <OverflowList.Item key={action.id} data={action} asChild>
+      <button className="shrink-0" onClick={action.run}>
+        {action.label}
+      </button>
+    </OverflowList.Item>
+  ))}
 
   <OverflowList.Overflow<Action>>
     {({ overflowItems }) => (
-      <Dropdown>
+      <DropdownMenu>
         <OverflowList.Accessory asChild>
-          <Dropdown.Trigger>More</Dropdown.Trigger>
+          <DropdownMenu.Trigger>更多</DropdownMenu.Trigger>
         </OverflowList.Accessory>
 
-        <Dropdown.Content>
+        <DropdownMenu.Content>
           {overflowItems.map(renderAction)}
-        </Dropdown.Content>
-      </Dropdown>
+        </DropdownMenu.Content>
+      </DropdownMenu>
     )}
   </OverflowList.Overflow>
 </OverflowList>
 ```
 
-`Item.data` 可以是任意业务数据。可见结果始终是 DOM 顺序的连续前缀，隐藏部分按照相同顺序出现在 `overflowItems` 中。隐藏 Item 会渲染为 `null`，因此内部状态、焦点和未受控表单状态不会保留。
+- `Item` 声明一个可以从列表尾部省略的元素，并携带对应业务数据。
+- `Overflow` 使用 render function 暴露当前溢出的 Item 数据，自身不创建 DOM。
+- `Accessory` 声明溢出状态下进入 Root 布局的真实元素。
 
-`Overflow` 本身不产生 DOM。没有溢出时，它的 render function 仍会收到空数组；测量期间它也可能收到候选结果，因此 render function 应保持为纯渲染。
+Item 和 Accessory 最终渲染出的 HTMLElement 必须是 Root 的直接子节点。Dropdown Root、Context Provider 和 Portal 等不产生 Root 常规流 DOM 的结构可以出现在 Overflow 的渲染结果中。
 
-Accessory 可以有多个，并且总是共同显示或隐藏。没有溢出时 Accessory 渲染为 `null`；需要测量时，它会短暂以不可见、不可交互的状态参与真实布局。如果隐藏全部 Item 后 Accessory 仍然放不下，组件会保留 Accessory 展示。
+## Item 顺序与状态
 
-## 布局边界
+Item 的优先级由最终 DOM 顺序表达。组件始终保留一个连续前缀，不会隐藏中间 Item 后继续展示后面的 Item。
 
-- Root 应是不换行的横向布局，并通过自己的 content box 表达可用宽度。
+```tsx
+<OverflowList.Item data={primaryAction}>最高优先级</OverflowList.Item>
+<OverflowList.Item data={secondaryAction}>次要操作</OverflowList.Item>
+<OverflowList.Item data={dangerAction}>最低优先级</OverflowList.Item>
+```
+
+隐藏 Item 渲染为 `null`。Item 再次变为可见时会重新挂载，因此以下状态会重新初始化：
+
+- Item 子树中的组件状态和 effect。
+- 未受控表单状态。
+- 当前焦点和进行中的 DOM 交互。
+- 调用方持有的 Item 元素 ref。
+
+需要在隐藏期间保留的数据应提升到 OverflowList 外部，或者存储在 `Item.data` 对应的业务状态中。
+
+## Overflow 数据
+
+`Item.data` 可以是任意业务数据。隐藏 Item 的 data 按照 DOM 顺序组成 `overflowItems`：
+
+```tsx
+<OverflowList.Overflow<Action>>
+  {({ overflowItems }) => (
+    <ActionMenu actions={overflowItems} />
+  )}
+</OverflowList.Overflow>
+```
+
+没有溢出时，render function 会收到空数组。重新测量期间，组件可能先提交全部可见状态和候选溢出结果，再提交考虑 Accessory 宽度后的最终结果，因此 render function 应保持为纯渲染。
+
+Overflow 可以返回 Dropdown、Context Provider、Portal 或其他组合结构。任何需要在 Root 常规流中占用空间的溢出 UI，都应通过 Accessory 注册为布局元素。
+
+Overflow 的泛型只描述 render props 中的 data 类型。组件在运行时按引用透传 `Item.data`，不会检查各个 Item 是否使用相同数据结构。
+
+## Accessory
+
+Accessory 只在至少一个 Item 溢出时参与布局。它可以是更多按钮、菜单 Trigger、计数器，也可以存在多个；同一个 Root 中的所有 Accessory 共同显示或隐藏，并以真实布局跨度参与计算。
+
+检测到候选溢出后，Accessory 会先以测量状态挂载。测量状态使用：
+
+- `visibility: hidden`
+- `pointer-events: none`
+- `aria-hidden="true"`
+- `data-overflow-list-measuring`
+
+这些样式让 Accessory 进入真实布局，同时保持不可见、不可交互。测量完成后，同一个 Accessory 元素进入正常展示状态。Accessory 的内容和宽度可以由调用方决定，无需预先声明固定宽度。
+
+当 Accessory 对应 Dropdown Trigger 时，使用 `asChild` 把测量 ref 和状态连接到最终 Trigger 元素：
+
+```tsx
+<DropdownMenu>
+  <OverflowList.Accessory asChild>
+    <DropdownMenu.Trigger asChild>
+      <button type="button">更多</button>
+    </DropdownMenu.Trigger>
+  </OverflowList.Accessory>
+
+  <DropdownMenu.Content>{/* overflow items */}</DropdownMenu.Content>
+</DropdownMenu>
+```
+
+Dropdown Root 可以不产生 DOM，但 Accessory 最终连接到的 HTMLElement 必须是 OverflowList Root 的直接子节点。
+
+没有溢出时 Accessory 渲染为 `null`。从无溢出切换到溢出时，它的子树会重新挂载。如果隐藏全部 Item 后 Accessory 仍然无法放入 Root，组件会保留 Accessory 展示。
+
+## 布局与样式
+
+Root 应形成一个不换行的横向布局，并通过自己的 content box 表示列表可用宽度。flex 布局通常需要为 Root 设置 `min-width: 0`，让它能够在父级中获得真实的收缩宽度。
+
+Item 通常应保持不可收缩，例如使用 `flex-shrink: 0`。允许 Item 收缩时，浏览器会先缩小 Item，再由 OverflowList 判断哪些 Item 需要隐藏。
+
+推荐使用 Root 的 `gap` 表达 Item 和 Accessory 之间的间距。组件读取元素在真实布局中的水平跨度，因此无需提前声明固定 gap；首尾 margin、负 margin、绝对定位和 transform 会让元素视觉范围与布局范围产生不同语义。
+
+Root 的常规流中应只包含注册的 Item 和 Accessory。固定标题、标签或始终展示的操作应放在 OverflowList 外部，由外层 flex 或 grid 为 OverflowList 分配剩余宽度。
+
+## 状态与重新测量
+
+首次可信测量完成前，全部 Item 可见，Accessory 不渲染，Root 不带 `data-overflow`。测量完成后，组件提交最终可见前缀和 overflow 数据。
+
+以下变化会使布局结果重新计算：
+
+- Root content box 宽度变化。
+- 当前可见 Item 的 border box 宽度变化。
+- 当前可见 Accessory 的 border box 宽度变化。
+- Item 或 Accessory 挂载、卸载或最终 DOM 元素替换。
+- Item 的 `data` 引用变化。
+
+隐藏 Item 没有 DOM，因此无法继续观察它的尺寸。如果只有隐藏 Item 因外部样式变化而缩小，组件无法直接得知它已经可以重新展示。改变对应 Item 的 `data` 或 key、改变 Root 宽度，或者重新挂载列表，会重新建立完整测量结果。
+
+重新测量任务会根据 Root 与视窗的距离安排优先级。远离视窗的大量实例可能稍后完成状态更新，具体调度机制记录在[实现原理](../implementation/)。
+
+## API 参考
+
+### Root
+
+包含 OverflowList 的全部部分，默认渲染为 `div`。Root 的 content box 表示列表可以使用的宽度。
+
+**默认元素：** `div`  
+**Ref：** `HTMLElement`  
+**支持 `asChild`：** 是
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `asChild` | `boolean` | `false` | 将 Root 的 props、ref 和 overflow 状态合并到唯一 child。 |
+
+除上述属性外，Root 支持 `div` 的原生属性。
+
+#### Data attributes
+
+| Attribute | Value | Condition |
+| --- | --- | --- |
+| `data-overflow` | `""` | 至少一个 Item 溢出时存在。 |
+
+### Item
+
+声明一个可以从列表尾部隐藏的元素，默认渲染为 `span`。
+
+**默认元素：** `span`  
+**Ref：** `HTMLElement`  
+**支持 `asChild`：** 是
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `data` | `any` | 必填 | Item 隐藏后出现在 `overflowItems` 中的业务数据。 |
+| `asChild` | `boolean` | `false` | 将 Item 的 props、ref 和注册行为合并到唯一 child。 |
+
+除上述属性外，Item 支持 `span` 的原生属性。`data` 只用于生成 overflowItems，不会作为 DOM attribute 转发。
+
+### Overflow
+
+通过 render function 暴露当前溢出的 Item 数据。Overflow 不创建 DOM，也不接收 ref 或原生元素属性。
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `children` | `(props: { overflowItems: readonly Data[] }) => ReactNode` | 必填 | 根据当前溢出数据渲染菜单、Accessory 或其他业务结构。 |
+
+### Accessory
+
+声明溢出状态下参与布局的附属元素，默认渲染为 `span`。
+
+**默认元素：** `span`  
+**Ref：** `HTMLElement`  
+**支持 `asChild`：** 是
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `asChild` | `boolean` | `false` | 将 Accessory 的 props、ref 和测量状态合并到唯一 child。 |
+
+除上述属性外，Accessory 支持 `span` 的原生属性。测量状态会把 `aria-hidden` 设为 `true`，并把行内 `visibility` 和 `pointerEvents` 分别设为 `hidden` 和 `none`；正常展示时使用调用方传入的值。
+
+#### Data attributes
+
+| Attribute | Value | Condition |
+| --- | --- | --- |
+| `data-overflow-list-measuring` | `""` | Accessory 以不可见状态参与布局测量时存在。 |
+
+## 边界
+
+- OverflowList 支持单行横向列表，可见结果始终是 DOM 顺序中的连续前缀。
 - Item 和 Accessory 最终渲染出的 HTMLElement 必须是 Root 的直接子节点。
-- Item 通常应设置为不可收缩，例如使用 `shrink-0`，否则浏览器会先压缩 Item，再由组件判断是否溢出。
-- 推荐使用 Root 的 `gap` 表达间距。首尾 margin、绝对定位、transform、负 margin 和独立 Separator 不属于稳定测量模型。
-- `direction: ltr` 和 `direction: rtl` 都可以使用，但优先级始终由 DOM 顺序决定。CSS `order` 或 `row-reverse` 不会改变组件的隐藏顺序。
-- 隐藏 Item 没有 DOM。如果只有隐藏 Item 因外部样式变化而缩小，需要改变对应 `data`/key、Root 尺寸或重新挂载列表来触发重新测量。
+- Item 应保持不可收缩，或者由调用方接受 Item 先收缩再溢出的布局结果。
+- 多个 Accessory 共同显示、共同隐藏，不支持根据剩余空间分别省略。
+- DOM 顺序表达 Item 优先级；CSS `order` 和 `row-reverse` 不改变隐藏顺序。
+- LTR 和 RTL 使用相同的 DOM 顺序优先级。
+- Separator 的展示依赖相邻 Item 状态，当前布局模型不单独管理 Separator。
+- 首尾 margin、负 margin、绝对定位、transform 和脱离常规流的内容不属于稳定测量模型。
+- 隐藏 Item 和未展示的 Accessory 会卸载，对应子树的状态与焦点不会保留。
+
+## 相关内容
+
+- [FitSwitch](./fit-switch)：根据完整视图的宽度在 Expanded 和 Collapsed 之间切换。
+- [OverflowList 实验室](../lab/overflow-list)：观察大量实例在宽度和内容连续变化时的表现。
+- [OverflowList DOM 调度实验](../lab/overflow-list-dom)：对比保持全部 Item DOM 与 React 条件挂载的实现。
