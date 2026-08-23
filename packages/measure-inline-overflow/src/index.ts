@@ -8,46 +8,26 @@
 export type MeasureInlineOverflowOptions = {
   /**
    * @en
-   * The container element that defines the width available to Content.
+   * The content-box width available to the element's rendered content.
    *
-   * When omitted, Content itself is used as the Container.
-   *
-   * @zh
-   * 为 Content 提供可用宽度的容器元素。
-   *
-   * 未提供时，使用 Content 自身作为 Container。
-   */
-  container?: HTMLElement;
-
-  /**
-   * @en
-   * A known content-box width for the resolved Container.
-   *
-   * It can reuse a size supplied by ResizeObserver or another external layout
-   * source and avoid reading computed style when the content-box width is
-   * needed. The value must be finite and non-negative.
+   * The value uses untransformed CSS pixels. When omitted, the element's own
+   * content-box width is derived from its current layout.
    *
    * @zh
-   * 已知的 Container content-box width。
+   * 元素已渲染内容可使用的 content-box 宽度。
    *
-   * 可以复用 ResizeObserver 等外部来源提供的尺寸，并在需要 content-box
-   * width 时避免读取 computed style。该值必须是有限的非负数。
+   * 该值使用未经过 transform 的 CSS 像素。未提供时，从元素当前布局派生
+   * 自身的 content-box 宽度。
    */
-  containerContentBoxWidth?: number;
+  availableWidth?: number;
 
   /**
    * @en
    * Whether to skip the high-precision Range fallback within the integer
    * precision boundary.
    *
-   * When disabled, the function uses the direct `scrollWidth > availableWidth`
-   * comparison without applying the precision boundary as an epsilon.
-   *
    * @zh
    * 是否跳过整数精度临界区间内的 Range 高精度补充测量。
-   *
-   * 禁用后，函数直接使用 `scrollWidth > availableWidth`，不会把整数精度
-   * 临界值作为 epsilon 应用到普通比较。
    *
    * @default `false`
    */
@@ -57,42 +37,45 @@ export type MeasureInlineOverflowOptions = {
 const EMPTY_MEASURE_INLINE_OVERFLOW_OPTIONS: MeasureInlineOverflowOptions = {};
 const SCROLL_WIDTH_PRECISION_BOUNDARY = 1;
 
-const getContainerContentBoxWidth = (container: HTMLElement): number => {
-  const view = container.ownerDocument.defaultView;
-  const style = view
-    ? view.getComputedStyle(container)
-    : getComputedStyle(container);
-  const paddingInlineStart = Number.parseFloat(style.paddingInlineStart) || 0;
-  const paddingInlineEnd = Number.parseFloat(style.paddingInlineEnd) || 0;
+const getElementComputedStyle = (element: HTMLElement): CSSStyleDeclaration => {
+  const view = element.ownerDocument.defaultView;
 
-  return Math.max(
-    0,
-    container.clientWidth - paddingInlineStart - paddingInlineEnd,
+  return view ? view.getComputedStyle(element) : getComputedStyle(element);
+};
+
+const getCSSPixelValue = (
+  style: CSSStyleDeclaration,
+  property: keyof CSSStyleDeclaration,
+): number => {
+  const value = Number.parseFloat(String(style[property]));
+
+  return Number.isFinite(value) ? value : 0;
+};
+
+const getInlinePaddingWidth = (style: CSSStyleDeclaration): number => {
+  return (
+    getCSSPixelValue(style, 'paddingInlineStart') + getCSSPixelValue(style, 'paddingInlineEnd')
   );
 };
 
-const getRangeWidth = (content: HTMLElement): number => {
-  const range = content.ownerDocument.createRange();
-  range.selectNodeContents(content);
+const getElementContentBoxWidth = (element: HTMLElement, inlinePaddingWidth: number): number => {
+  return Math.max(0, element.clientWidth - inlinePaddingWidth);
+};
+
+const getRangeWidth = (element: HTMLElement): number => {
+  const range = element.ownerDocument.createRange();
+
+  range.selectNodeContents(element);
 
   return range.getBoundingClientRect().width;
 };
 
-const resolveContainerContentBoxWidth = (
-  container: HTMLElement,
-  observedWidth: number | undefined,
-): number => {
-  if (typeof observedWidth === 'undefined') {
-    return getContainerContentBoxWidth(container);
+const resolveAvailableWidth = (availableWidth: number): number => {
+  if (!Number.isFinite(availableWidth) || availableWidth < 0) {
+    throw new RangeError('availableWidth must be a finite, non-negative number.');
   }
 
-  if (!Number.isFinite(observedWidth) || observedWidth < 0) {
-    throw new RangeError(
-      'containerContentBoxWidth must be a finite, non-negative number.',
-    );
-  }
-
-  return observedWidth;
+  return availableWidth;
 };
 
 /**
@@ -102,12 +85,10 @@ const resolveContainerContentBoxWidth = (
  * be measured with Range.
  */
 const resolveScrollWidthOverflow = (
-  content: HTMLElement,
+  element: HTMLElement,
   widthDifference: number,
   disableRangeFallback: boolean | undefined,
 ): boolean | null => {
-  // The precision boundary only selects when Range should take over. It is not
-  // a tolerance for the regular scrollWidth comparison.
   if (disableRangeFallback === true) {
     return widthDifference > 0;
   }
@@ -116,23 +97,20 @@ const resolveScrollWidthOverflow = (
     return true;
   }
 
-  if (
-    widthDifference <= -SCROLL_WIDTH_PRECISION_BOUNDARY ||
-    !content.hasChildNodes()
-  ) {
+  if (widthDifference <= -SCROLL_WIDTH_PRECISION_BOUNDARY || !element.hasChildNodes()) {
     return false;
   }
 
   return null;
 };
 
-const measureWithSharedContainer = (
-  content: HTMLElement,
+const measureWithElementWidth = (
+  element: HTMLElement,
   options: MeasureInlineOverflowOptions,
 ): boolean => {
   const scrollWidthOverflow = resolveScrollWidthOverflow(
-    content,
-    content.scrollWidth - content.clientWidth,
+    element,
+    element.scrollWidth - element.clientWidth,
     options.disableRangeFallback,
   );
 
@@ -140,26 +118,29 @@ const measureWithSharedContainer = (
     return scrollWidthOverflow;
   }
 
-  const availableContentWidth = resolveContainerContentBoxWidth(
-    content,
-    options.containerContentBoxWidth,
-  );
+  const style = getElementComputedStyle(element);
+  const availableWidth = getElementContentBoxWidth(element, getInlinePaddingWidth(style));
 
-  return getRangeWidth(content) > availableContentWidth;
+  return getRangeWidth(element) > availableWidth;
 };
 
-const measureWithSeparateContainer = (
-  content: HTMLElement,
-  container: HTMLElement,
+const measureWithAvailableWidth = (
+  element: HTMLElement,
+  availableWidth: number,
   options: MeasureInlineOverflowOptions,
 ): boolean => {
-  const availableContentWidth = resolveContainerContentBoxWidth(
-    container,
-    options.containerContentBoxWidth,
-  );
+  const style = getElementComputedStyle(element);
+  const inlinePaddingWidth = getInlinePaddingWidth(style);
+  const elementContentBoxWidth = getElementContentBoxWidth(element, inlinePaddingWidth);
+  const contentScrollWidth = Math.max(0, element.scrollWidth - inlinePaddingWidth);
+
+  if (options.disableRangeFallback !== true && availableWidth < elementContentBoxWidth) {
+    return getRangeWidth(element) > availableWidth;
+  }
+
   const scrollWidthOverflow = resolveScrollWidthOverflow(
-    content,
-    content.scrollWidth - availableContentWidth,
+    element,
+    contentScrollWidth - availableWidth,
     options.disableRangeFallback,
   );
 
@@ -167,17 +148,18 @@ const measureWithSeparateContainer = (
     return scrollWidthOverflow;
   }
 
-  return getRangeWidth(content) > availableContentWidth;
+  return getRangeWidth(element) > availableWidth;
 };
 
 /**
  * @en
- * Measures whether Content has single-line horizontal overflow.
+ * Measures whether an element's rendered content has single-line horizontal
+ * overflow.
  *
- * The function first compares `scrollWidth` with the available width. When the
- * result is within the one-pixel integer precision boundary, non-empty Content
- * uses its Range width to detect boundary overflow caused by subpixel browser
- * layout.
+ * The function first uses integer scroll geometry. Results within the
+ * one-pixel precision boundary use a Range bounding rect to detect subpixel
+ * overflow. `availableWidth` uses untransformed layout CSS pixels, and the
+ * Range fallback assumes that transforms do not change its coordinate space.
  *
  * A Range bounding rect supports text, elements, and mixed content in a regular
  * single-line flow, but it is not the intrinsic width of an arbitrary DOM
@@ -185,26 +167,25 @@ const measureWithSeparateContainer = (
  * layouts are outside the reliable scope of this fallback.
  *
  * @zh
- * 测量 Content 是否发生单行横向溢出。
+ * 测量元素已渲染内容是否发生单行横向溢出。
  *
- * 默认使用 `scrollWidth` 与可用宽度进行快速比较。当结果位于一像素的整数精度
- * 临界区间内时，非空 Content 会使用 Range width 补充判断浏览器亚像素布局造成的
- * 边界溢出。
+ * 函数首先使用整数滚动几何。结果位于一像素精度临界区间内时，使用 Range
+ * bounding rect 检测亚像素溢出。`availableWidth` 使用未经过 transform 的布局
+ * CSS 像素，Range fallback 假定 transform 不会改变其坐标空间。
  *
  * Range bounding rect 适用于普通单行 flow 中的文本、元素和混合内容，但不是
  * 任意 DOM 子树的 intrinsic width。margin、伪元素、定位、transform 和多行布局
  * 不属于该 fallback 的可靠测量范围。
  */
 export const measureInlineOverflow = (
-  content: HTMLElement,
+  element: HTMLElement,
   options?: MeasureInlineOverflowOptions,
 ): boolean => {
-  const resolvedOptions = typeof options === 'undefined'
-    ? EMPTY_MEASURE_INLINE_OVERFLOW_OPTIONS
-    : options;
-  const container = resolvedOptions.container ?? content;
+  const resolvedOptions =
+    typeof options === 'undefined' ? EMPTY_MEASURE_INLINE_OVERFLOW_OPTIONS : options;
+  const availableWidth = resolvedOptions.availableWidth;
 
-  return container === content
-    ? measureWithSharedContainer(content, resolvedOptions)
-    : measureWithSeparateContainer(content, container, resolvedOptions);
+  return typeof availableWidth === 'undefined'
+    ? measureWithElementWidth(element, resolvedOptions)
+    : measureWithAvailableWidth(element, resolveAvailableWidth(availableWidth), resolvedOptions);
 };
