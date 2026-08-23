@@ -23,6 +23,10 @@
       "types": "./src/FitGrid/index.ts",
       "import": "./src/FitGrid/index.ts"
     },
+    "./fit-list": {
+      "types": "./src/FitList/index.ts",
+      "import": "./src/FitList/index.ts"
+    },
     "./fit-switch": {
       "types": "./src/FitSwitch/index.ts",
       "import": "./src/FitSwitch/index.ts"
@@ -82,6 +86,10 @@
         "types": "./dist/FitGrid/index.d.ts",
         "import": "./dist/FitGrid/index.js"
       },
+      "./fit-list": {
+        "types": "./dist/FitList/index.d.ts",
+        "import": "./dist/FitList/index.js"
+      },
       "./fit-switch": {
         "types": "./dist/FitSwitch/index.d.ts",
         "import": "./dist/FitSwitch/index.js"
@@ -109,6 +117,7 @@
     }
   },
   "dependencies": {
+    "@guanriyue/measure-inline-overflow": "workspace:*",
     "@guanriyue/resize-observer-hub": "workspace:*",
     "@radix-ui/react-compose-refs": "^1.1.3",
     "@radix-ui/react-primitive": "^2.1.7",

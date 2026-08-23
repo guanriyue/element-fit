@@ -46,6 +46,9 @@ importers:
 
   packages/react-fit:
     dependencies:
+      '@guanriyue/measure-inline-overflow':
+        specifier: workspace:*
+        version: link:../measure-inline-overflow
       '@guanriyue/resize-observer-hub':
         specifier: workspace:*
         version: link:../resize-observer-hub
