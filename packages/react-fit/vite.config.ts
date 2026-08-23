@@ -73,6 +73,7 @@ export default defineConfig({
         index: resolve(root, 'src/index.ts'),
         'CompactGrid/index': resolve(root, 'src/CompactGrid/index.ts'),
         'FitGrid/index': resolve(root, 'src/FitGrid/index.ts'),
+        'FitList/index': resolve(root, 'src/FitList/index.ts'),
         'FitSwitch/index': resolve(root, 'src/FitSwitch/index.ts'),
         'InlineOverflow/index': resolve(root, 'src/InlineOverflow/index.ts'),
         'LineClamp/index': resolve(root, 'src/LineClamp/index.ts'),
