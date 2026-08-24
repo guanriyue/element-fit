@@ -1,0 +1,13 @@
+---
+description: FitList 大量实例下的 DOM 状态切换与布局测量性能观测页面。
+outline: false
+pageType: doc-wide
+---
+
+import { FitListStressTest } from '@/stress-tests/fit-list';
+
+# FitList 压力测试
+
+页面可以渲染 20、50、100、200、300 或 500 个实例，并在 FitList 与 CSS Container Query 基线之间切换。可以批量改变标题长度、容器宽度或持续缩放，观察候选模式切换和布局测量时的 FPS 变化。
+
+<FitListStressTest />

@@ -11,6 +11,11 @@
   },
   {
     "type": "file",
+    "name": "fit-list",
+    "label": "FitList"
+  },
+  {
+    "type": "file",
     "name": "fit-switch",
     "label": "FitSwitch"
   },
