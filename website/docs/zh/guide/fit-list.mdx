@@ -1,0 +1,216 @@
+---
+description: FitList 在同一组 Item 中切换完整内容和紧凑内容，并保留每个 Item 的 DOM 身份。
+outline: true
+pageType: doc
+---
+
+# FitList
+
+`FitList` 根据单行可用空间，在同一组 Item 中切换 `Expanded` 和 `Compact`。空间足够时展示完整内容；空间不足时，所有 Item 共同进入紧凑模式。
+
+切换过程中 Item 不会被替换或卸载。对于 Tabs、导航和操作按钮，同一个业务项始终对应同一个可聚焦元素，只有元素内部的标题、缩写或附属内容改变状态。
+
+## 适用场景
+
+FitList 适合以下布局：
+
+- Tabs 空间足够时展示“图标 + 标题”，空间不足时只保留图标。
+- 导航项在完整标题和短标题之间切换。
+- 操作按钮在 expanded 模式展示说明文字，在 compact 模式展示简短标记。
+- 切换形态时需要保留 Item 的焦点、内部状态和 DOM 身份。
+
+FitList 的切换单位是所有 Item 的内部内容。需要在两套完整视图之间切换时，应使用 [FitSwitch](./fit-switch)；需要保留前部操作并把尾部操作收进菜单时，应使用 [OverflowList](./overflow-list)。
+
+## 导入
+
+```tsx
+import { FitList } from '@guanriyue/react-fit/fit-list';
+```
+
+## 基础用法
+
+下面的 Tabs 始终使用同一组 TabsTrigger。可以调整容器宽度、Item 数量和 Expanded 文案长度，也可以为
+compact 模式增加短标题，观察内容变化后的模式切换。
+
+```tsx file="<root>/src/demos/fit-list/tabs.tsx" preview
+
+```
+
+普通列表可以直接使用组件提供的默认元素：
+
+```tsx
+<FitList className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap">
+  {actions.map((action) => (
+    <FitList.Item key={action.id} className="shrink-0">
+      <button type="button" aria-label={action.label}>
+        <ActionIcon aria-hidden="true" />
+
+        <FitList.Expanded className="data-inactive:hidden">
+          {action.label}
+        </FitList.Expanded>
+
+        <FitList.Compact className="data-inactive:hidden">
+          {action.shortLabel}
+        </FitList.Compact>
+      </button>
+    </FitList.Item>
+  ))}
+</FitList>
+```
+
+如果紧凑模式只需要保留 Item 中始终存在的图标，可以省略 `Compact`。Tabs 示例可以在纯图标和短标题两种
+compact 表达之间切换。
+
+## Expanded 与 Compact
+
+`Expanded` 表示空间足够时生效的内容，`Compact` 表示空间不足时生效的内容。两者始终保持挂载，当前不生效的节点带有空值的 `data-inactive` attribute。
+
+```tsx
+<FitList.Expanded className="data-inactive:hidden">
+  完整标题
+</FitList.Expanded>
+
+<FitList.Compact className="data-inactive:hidden">
+  短标题
+</FitList.Compact>
+```
+
+组件不提供默认隐藏样式。最常见的方式是使用 `data-inactive:hidden`；也可以让 inactive 内容通过绝对定位和透明度保持可测量。`data-inactive` 只表达当前状态，不等价于 `hidden`、`inert` 或 `aria-hidden`。
+
+一个 Item 可以包含多个 Expanded 或 Compact，它们分别共享对应模式。内容不需要严格成对出现：可以只声明 Expanded，也可以只在 compact 模式下增加额外内容。
+
+## 模式选择
+
+FitList 判断全部 Expanded 内容能否同时放入 Root。能够放下时使用 expanded 模式，否则切换到 compact 模式。所有 Item 共享同一个 mode，不会逐项折叠。
+
+Compact 是最终回退形态。如果 Compact 仍然超过 Root，组件会保持 compact，不会继续隐藏 Item、切换第三种形态或发出警告。因此 Compact 应由调用方设计为在目标最小宽度下仍然可用的表达。
+
+首次可信测量完成前使用 expanded 模式。测量期间，Root 会短暂带有 `data-measuring`；需要时可以根据这个 attribute 关闭尺寸 transition，避免过渡中的布局影响判断。
+
+## Item 身份与状态
+
+Expanded 和 Compact 切换时：
+
+- Item 及其可聚焦元素不会重新挂载。
+- Item 内部的组件状态、未受控状态和 ref 会保留。
+- 当前焦点不会因为切换到另一套 Item DOM 而转移。
+- Expanded 和 Compact 子树都保持挂载，各自的组件状态和 effect 也会保留。
+
+只有 inactive 内容的展示状态发生变化。使用 `display: none` 时，浏览器会自然地把 inactive 子树移出布局和无障碍树；使用透明度或绝对定位时，调用方还需要处理其中的焦点、点击和无障碍语义。
+
+## 布局要求
+
+Root 应形成不换行的横向布局，并通过自己的 content box 表达全部可用宽度。flex 布局通常需要 `min-width: 0`，Item 通常需要 `flex-shrink: 0`：
+
+```tsx
+<FitList className="flex min-w-0 flex-nowrap gap-2 overflow-hidden">
+  <FitList.Item className="shrink-0">...</FitList.Item>
+  <FitList.Item className="shrink-0">...</FitList.Item>
+</FitList>
+```
+
+如果 Item 可以收缩，浏览器可能先压缩完整内容，使 Expanded 看起来仍然能够放下。此时组件判断的是收缩后的真实布局，而不是完整内容原本需要的宽度。
+
+Item 最终渲染出的 HTMLElement 必须是 Root 的直接子节点。Expanded 和 Compact 应位于对应 Item 的 DOM subtree 中。Root 的常规流中不应混入未注册且尺寸可能独立变化的列表项。
+
+## API 参考
+
+### Root
+
+包含全部 Item，默认渲染为 `div`。Root 的 content box 表示列表可以使用的宽度。
+
+**默认元素：** `div`  
+**Ref：** `HTMLElement`  
+**支持 `asChild`：** 是
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `asChild` | `boolean` | `false` | 将 Root 的 props 和测量 ref 合并到唯一 child。 |
+
+除上述属性外，Root 支持 `div` 的原生属性。
+
+#### Data attributes
+
+| Attribute | Value | Condition |
+| --- | --- | --- |
+| `data-measuring` | `""` | 正在测量 expanded 布局时存在。 |
+
+### Item
+
+声明一个始终保留的列表项，默认渲染为 `span`。
+
+**默认元素：** `span`  
+**Ref：** `HTMLElement`  
+**支持 `asChild`：** 是
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `asChild` | `boolean` | `false` | 将 Item 的 props、ref 和注册行为合并到唯一 child。 |
+
+除上述属性外，Item 支持 `span` 的原生属性。Item 没有状态 attribute。
+
+### Expanded
+
+声明 expanded 模式下生效的内容，默认渲染为 `span`。
+
+**默认元素：** `span`  
+**Ref：** `HTMLElement`  
+**支持 `asChild`：** 是
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `asChild` | `boolean` | `false` | 将 Expanded 的 props、ref 和状态 attribute 合并到唯一 child。 |
+
+除上述属性外，Expanded 支持 `span` 的原生属性。
+
+#### Data attributes
+
+| Attribute | Value | Condition |
+| --- | --- | --- |
+| `data-inactive` | `""` | 当前处于 compact 模式。 |
+
+### Compact
+
+声明 compact 模式下生效的内容，默认渲染为 `span`。
+
+**默认元素：** `span`  
+**Ref：** `HTMLElement`  
+**支持 `asChild`：** 是
+
+#### Props
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `asChild` | `boolean` | `false` | 将 Compact 的 props、ref 和状态 attribute 合并到唯一 child。 |
+
+除上述属性外，Compact 支持 `span` 的原生属性。
+
+#### Data attributes
+
+| Attribute | Value | Condition |
+| --- | --- | --- |
+| `data-inactive` | `""` | 当前处于 expanded 模式。 |
+
+## 边界
+
+- FitList 只支持单行横向布局，不支持通过换行建立多行回退。
+- 所有 Item 共同处于 expanded 或 compact 模式，不支持逐项选择不同模式。
+- Item 必须是 Root 的直接 DOM 子节点，Expanded 和 Compact 应位于对应 Item 内部。
+- Compact 是最终回退形态，组件不验证它是否能够放下。
+- Item 应保持不可收缩，或者由调用方接受组件基于收缩后布局进行判断。
+- inactive 内容的隐藏、焦点和无障碍行为由调用方负责。
+- 只修改外部样式表且没有引起 Root 或可见 Item 尺寸变化时，不保证隐藏 Expanded 的宽度变化能够被发现。
+- 多行内容、复杂 transform、负 margin、脱离预期常规流的布局和伪元素尺寸不属于稳定测量模型。
+- 当前不提供受控 mode、默认 mode、手动 remeasure 或 mode change callback。
+
+## 相关内容
+
+- [FitSwitch](./fit-switch)：在两套完整视图之间切换，两套 View 始终保持挂载。
+- [OverflowList](./overflow-list)：保留前部 Item，并把尾部 Item 数据交给自定义溢出渲染器。
+- [FitList 实验室](../lab/fit-list)：观察大量实例在宽度和内容连续变化时的表现。
